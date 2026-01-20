@@ -123,7 +123,7 @@ class MPFITObjective(Objective):
             # Convert the flat multipoles to hierarchical format
             flat_multipoles = gdma_record.multipoles
             num_sites = flat_multipoles.shape[0]
-            multipoles = convert_flat_to_hierarchical(flat_multipoles, num_sites, max_rank)
+            multipoles = _convert_flat_to_hierarchical(flat_multipoles, num_sites, max_rank)
 
             fixed_atom_charges = numpy.zeros((molecule.n_atoms, 1))
             atom_charge_design_matrices = []

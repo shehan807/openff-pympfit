@@ -42,9 +42,10 @@ def main():
     mpfit_charge_parameter = generate_mpfit_charge_parameter(
        [qc_data_record], mpfit_solver
     )
-    mpfit_charges = LibraryChargeGenerator.generate(
-       molecule, LibraryChargeCollection(parameters=[mpfit_charge_parameter])
-    )
+    # TODO: Fix tolerance issue with conda openff-recharge 0.5.3 vs fork
+    # mpfit_charges = LibraryChargeGenerator.generate(
+    #    molecule, LibraryChargeCollection(parameters=[mpfit_charge_parameter])
+    # )
 
     print(f"MPFIT SMILES         : {mpfit_charge_parameter.smiles}")
     print(f"MPFIT VALUES (UNIQUE): {numpy.round(mpfit_charge_parameter.value, 4)}")

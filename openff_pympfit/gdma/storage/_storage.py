@@ -9,8 +9,7 @@ from contextlib import contextmanager
 from typing import ContextManager
 
 from openff.toolkit import Quantity, Molecule
-from openff.recharge._pydantic import BaseModel, Field
-from pydantic import ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from openff.toolkit.utils.exceptions import AtomMappingWarning

@@ -4,14 +4,10 @@ from enum import Enum
 from typing import TYPE_CHECKING, Literal
 
 from openff.units import unit, Quantity
-from openff.recharge._pydantic import BaseModel, Field
+from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from openff.toolkit import Molecule
-
-    PositiveFloat = float
-else:
-    from openff.recharge._pydantic import PositiveFloat
 
 
 class GDMASettings(BaseModel):
