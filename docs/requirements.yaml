@@ -1,22 +1,29 @@
-name: docs_OpenFF PyMPFIT
+name: openff-pympfit-docs
 channels:
-
   - conda-forge
-
-  - defaults
 dependencies:
-    # Base depends
+  # Base depends
   - python
   - pip
-  
+
+  # Core package dependencies
+  - numpy
+  - jinja2
+  - pydantic >=1.10.17,<3
+  - openff-utilities
+  - openff-units >=0.2
+  - openff-toolkit-base >=0.14
+  - openff-recharge >=0.5.0
+  - sqlalchemy
+  - sqlite
+
+  # Documentation dependencies
+  - sphinx
   - pydata-sphinx-theme
   - sphinx-design
   - sphinx-copybutton
 
-
-
-
-    # Pip-only installs
+  # Install package from repo root
   - pip:
-    - -e ../
+    - -e ..
 
