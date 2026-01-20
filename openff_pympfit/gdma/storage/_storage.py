@@ -26,7 +26,7 @@ from openff_pympfit.gdma.storage.db import (
     DBSoftwareProvenance,
 )
 from openff_pympfit.gdma.storage.exceptions import IncompatibleDBVersion
-from openff.recharge._annotations import (
+from openff_pympfit._annotations import (
     MP,
     Coordinates,
 )
