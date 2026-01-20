@@ -26,8 +26,8 @@ dependencies = [
 ]
 
 [project.urls]
-"Source" = "https://github.com/shehan807/openff_pympfit"
-"Documentation" = "https://openff_pympfit.readthedocs.io/"
+"Source" = "https://github.com/shehan807/openff-pympfit"
+"Documentation" = "https://openff-pympfit.readthedocs.io/"
 
 [project.optional-dependencies]
 test = [
@@ -64,7 +64,8 @@ where = ["."]
 # Ref https://setuptools.pypa.io/en/latest/userguide/datafiles.html#package-data
 [tool.setuptools.package-data]
 openff_pympfit = [
-    "py.typed"
+    "py.typed",
+    "data/**/*",
 ]
 
 [tool.versioningit]
