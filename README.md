@@ -6,6 +6,7 @@
 [//]: # (Badges)
 [![GitHub Actions Build Status](https://github.com/shehan807/openff_pympfit/workflows/CI/badge.svg)](https://github.com/shehan807/openff_pympfit/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/shehan807/openff_pympfit/branch/main/graph/badge.svg)](https://codecov.io/gh/shehan807/openff_pympfit)
+[![Documentation Status](https://readthedocs.org/projects/openff-pympfit/badge/?version=latest)](https://openff-pympfit.readthedocs.io/en/latest/?badge=latest)
 
 OpenFF-PyMPFIT is a free, open-source software for performing partial atomic charge fitting using the Gaussian distributed multipole analysis (GDMA). Features include:
 
