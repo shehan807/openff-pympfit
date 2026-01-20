@@ -1,0 +1,49 @@
+name: openff-pympfit-test-rdkit
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - pip
+  - click
+  - tqdm
+  - numpy =1
+  - scipy
+  - jinja2
+  - pydantic >=1.10.17,<3
+  - openff-utilities
+  - openff-units >=0.2
+  - openff-toolkit-base >=0.14
+  - openff-interchange-base >=0.3.19
+  - openff-recharge >=0.5.0
+  - openmm
+
+    # ESP storage
+  - sqlalchemy
+  - sqlite
+
+    ### Optional dependencies.
+  - rdkit
+
+    # ESP calculations
+  - psi4 =1.9
+
+    # XTB charges
+  - xtb-python
+  - geometric =1
+  - qcengine >=0.25
+  - qcelemental >=0.25.1
+
+    # QCFractal integration.
+  - qcportal >=0.50
+
+  # Optimization
+  - pytorch
+
+    # Testing
+  - pytest
+  - pytest-cov
+  - pytest-xdist
+
+    # Typing
+  - mypy
+  - typing_extensions
