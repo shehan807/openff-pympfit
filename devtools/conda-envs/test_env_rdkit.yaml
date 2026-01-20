@@ -26,6 +26,7 @@ dependencies:
 
     # ESP calculations
   - psi4 =1.9
+  - pygdma
 
     # XTB charges
   - xtb-python

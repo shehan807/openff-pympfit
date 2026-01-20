@@ -18,20 +18,22 @@ license-files = ["LICENSE"]
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
-requires-python = ">=3.8"
-# Declare any run-time dependencies that should be installed with the package.
-#dependencies = [
-#    "importlib-resources;python_version<'3.10'",
-#]
+requires-python = ">=3.10"
+dependencies = [
+    "openff-recharge>=0.5.0",
+    "openff-utilities",
+    "scipy>=1.7",
+]
 
-# Update the urls once the hosting is set up.
-#[project.urls]
-#"Source" = "https://github.com/<username>/openff_pympfit/"
-#"Documentation" = "https://openff_pympfit.readthedocs.io/"
+[project.urls]
+"Source" = "https://github.com/shehan807/openff_pympfit"
+"Documentation" = "https://openff_pympfit.readthedocs.io/"
 
 [project.optional-dependencies]
 test = [
-  "pytest>=6.1.2",
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-xdist>=3.0",
 ]
 
 [tool.setuptools]
@@ -82,3 +84,50 @@ default-tag = "1.0.0"
 
 [tool.versioningit.write]
 file = "openff_pympfit/_version.py"
+
+[tool.ruff]
+line-length = 88
+exclude = ["openff_pympfit/tests/", "openff_pympfit/_version.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "C", "I"]
+ignore = ["E203", "E266", "E501", "W503", "B905", "B902", "E704"]
+
+[tool.ruff.lint.isort]
+known-third-party = [
+    "click",
+    "jinja2",
+    "numpy",
+    "openeye",
+    "pydantic",
+    "scipy",
+    "sqlalchemy",
+    "typing_extensions",
+]
+
+[tool.coverage.run]
+omit = [
+    "*/tests/*",
+    "openff_pympfit/_version.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "@overload",
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.mypy]
+plugins = ["numpy.typing.mypy_plugin"]
+warn_unused_configs = true
+warn_unused_ignores = true
+show_error_codes = true
+disable_error_code = ["call-arg"]
+exclude = ["openff_pympfit/tests/"]
+
+[tool.pytest.ini_options]
+testpaths = ["openff_pympfit/tests"]
+addopts = "-v --tb=short"
