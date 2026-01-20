@@ -1,4 +1,104 @@
 User Guide
-===============
+==========
 
-This page details how to use OpenFF PyMPFIT. 
+This guide covers the main components and workflows in OpenFF PyMPFIT.
+
+GDMA Settings
+-------------
+
+The ``GDMASettings`` class configures the quantum chemistry calculation for
+distributed multipole analysis.
+
+.. code-block:: python
+
+    from openff_pympfit import GDMASettings
+
+    settings = GDMASettings(
+        basis="aug-cc-pvdz",      # Basis set
+        method="hf",              # QM method (hf, pbe0, mp2, etc.)
+        limit=2,                  # Max multipole rank (2 = up to quadrupole)
+        radius=[0.65, 0.65],      # DMA radius parameters
+        switch=4.0,               # Switching function parameter
+    )
+
+Working with Multiple Conformers
+--------------------------------
+
+MPFIT can average over multiple conformers for more robust charge fitting.
+
+.. code-block:: python
+
+    from openff.toolkit import Molecule
+    from openff.recharge.utilities.molecule import extract_conformers
+    from openff_pympfit import (
+        generate_mpfit_charge_parameter,
+        GDMASettings,
+        Psi4GDMAGenerator,
+        MoleculeGDMARecord,
+    )
+
+    molecule = Molecule.from_smiles("CCO")
+    molecule.generate_conformers(n_conformers=5)
+
+    settings = GDMASettings(basis="aug-cc-pvdz", method="hf", limit=2)
+
+    # Generate GDMA data for each conformer
+    records = []
+    for conformer in extract_conformers(molecule):
+        coords, multipoles = Psi4GDMAGenerator.generate(molecule, conformer, settings)
+        records.append(
+            MoleculeGDMARecord.from_molecule(molecule, coords, multipoles, settings)
+        )
+
+    # Fit charges using all conformers
+    library_charge = generate_mpfit_charge_parameter(records=records)
+
+Storing GDMA Records
+--------------------
+
+Use ``MoleculeGDMAStore`` to persist GDMA data to a SQLite database.
+
+.. code-block:: python
+
+    from openff_pympfit.gdma.storage import MoleculeGDMAStore
+
+    # Create or open a store
+    store = MoleculeGDMAStore("gdma_data.sqlite")
+
+    # Store records
+    for record in records:
+        store.store(record)
+
+    # Retrieve records by SMILES
+    retrieved = store.retrieve(smiles="[H:1][C:2]([H:3])([H:4])[C:5]([H:6])([H:7])[O:8][H:9]")
+
+Solver Options
+--------------
+
+MPFIT provides different solvers for the charge fitting problem.
+
+**SVD Solver (default):**
+
+.. code-block:: python
+
+    from openff_pympfit import MPFITSVDSolver
+
+    solver = MPFITSVDSolver()
+    library_charge = generate_mpfit_charge_parameter(
+        records=records,
+        solver=solver,
+    )
+
+**Iterative Solver:**
+
+For constrained optimization problems.
+
+.. code-block:: python
+
+    from openff_pympfit.mpfit.solvers import IterativeSolver
+
+    solver = IterativeSolver()
+    library_charge = generate_mpfit_charge_parameter(
+        records=records,
+        solver=solver,
+    ) 
