@@ -1,0 +1,232 @@
+================================================================================
+                    GDMA STORAGE TESTS ROADMAP
+================================================================================
+
+This document maps ESP storage tests from openff-recharge to their GDMA
+equivalents in openff-pympfit.
+
+Reference: openff-PyMPFIT-fork/openff/recharge/_tests/esp/test_storage.py
+
+================================================================================
+                    ESP → GDMA TEST MAPPING TABLE
+================================================================================
+
+TestMoleculeESPRecord Class (Lines 19-64)
+--------------------------------------------------------------------------------
+#  | ESP Test                      | Lines | GDMA Analog                | Needed?
+---|-------------------------------|-------|----------------------------|--------
+1  | test_validate_quantity        | 33-41 | test_validate_quantity     | YES
+2  | test_conformer_quantity       | 43-47 | test_conformer_quantity    | YES
+3  | test_grid_coordinates_quantity| 49-53 | N/A                        | NO (no grid)
+4  | test_esp_quantity             | 55-58 | test_multipoles_quantity   | YES
+5  | test_electric_field_quantity  | 60-64 | N/A                        | NO (no e-field)
+
+Standalone Store Tests (Lines 67-157)
+--------------------------------------------------------------------------------
+#  | ESP Test                      | Lines | GDMA Analog                | Needed?
+---|-------------------------------|-------|----------------------------|--------
+6  | test_db_version               | 67-78 | test_db_version            | YES
+7  | test_provenance               | 81-95 | test_provenance            | YES
+8  | test_db_invalid_version       | 98-112| test_db_invalid_version    | YES
+9  | test_record_from_molecule     |115-149| test_record_from_molecule  | YES
+10 | test_tagged_to_canonical_smiles|152-156| test_tagged_to_canonical_smiles | YES
+11 | test_store                    |159-185| test_store                 | YES
+
+Unique Settings Tests (Lines 188-282)
+--------------------------------------------------------------------------------
+#  | ESP Test                      | Lines | GDMA Analog                | Needed?
+---|-------------------------------|-------|----------------------------|--------
+12 | test_unique_esp_settings      |188-216| test_unique_gdma_settings  | YES
+13 | test_unique_grid_settings     |219-251| N/A                        | NO (no grid)
+14 | test_unique_pcm_settings      |254-282| N/A                        | NO (no PCM)
+
+Round-Trip Tests (Lines 285-340)
+--------------------------------------------------------------------------------
+#  | ESP Test                      | Lines | GDMA Analog                | Needed?
+---|-------------------------------|-------|----------------------------|--------
+15 | test_lattice_grid_settings_round_trip |285-304| N/A              | NO (no grid)
+16 | test_msk_grid_settings_round_trip     |307-320| N/A              | NO (no grid)
+17 | test_pcm_settings_round_trip          |323-340| N/A              | NO (no PCM)
+-- | N/A                                   | --    | test_gdma_settings_round_trip | YES (new)
+
+Retrieve Tests (Lines 343-431)
+--------------------------------------------------------------------------------
+#  | ESP Test                      | Lines | GDMA Analog                | Needed?
+---|-------------------------------|-------|----------------------------|--------
+18 | test_retrieve                 |343-431| test_retrieve (simplified) | YES
+   |                               |       | (no implicit_solvent filter)|
+
+
+================================================================================
+                    SUMMARY: 12 TESTS NEEDED FOR GDMA
+================================================================================
+
+Category   | Test Name                       | Priority | Status
+-----------|--------------------------------|----------|--------
+Record     | test_validate_quantity          | High     | TODO
+Record     | test_conformer_quantity         | High     | TODO
+Record     | test_multipoles_quantity        | High     | TODO
+Record     | test_record_from_molecule       | High     | TODO
+Store      | test_db_version                 | Medium   | TODO
+Store      | test_provenance                 | Medium   | TODO
+Store      | test_db_invalid_version         | Medium   | TODO
+Store      | test_tagged_to_canonical_smiles | Low      | TODO
+Store      | test_store                      | High     | TODO
+Store      | test_unique_gdma_settings       | Medium   | TODO
+Store      | test_gdma_settings_round_trip   | Medium   | TODO
+Store      | test_retrieve                   | High     | TODO
+
+
+================================================================================
+                    KEY DIFFERENCES: ESP vs GDMA
+================================================================================
+
+Aspect              | ESP                          | GDMA
+--------------------|------------------------------|-----------------------------
+Grid coordinates    | Yes                          | No
+Electric field      | Yes                          | No
+ESP values          | Yes (1D per grid point)      | No
+Multipoles          | No                           | Yes (n_atoms × 25 flat)
+PCM settings        | Yes (optional)               | No
+Grid settings       | Yes (Lattice or MSK)         | No
+Settings complexity | High (nested PCM + Grid)     | Low (flat GDMASettings)
+Retrieve filters    | smiles, basis, method,       | smiles, basis, method
+                    | implicit_solvent             |
+
+
+================================================================================
+                    PLAIN ENGLISH: WHAT EACH TEST DOES
+================================================================================
+
+RECORD TESTS (MoleculeGDMARecord)
+--------------------------------------------------------------------------------
+
+test_validate_quantity
+    When you create a record and pass in coordinates with units (e.g.,
+    nanometers), the record should automatically convert them to the internal
+    storage format (Angstroms). This test checks that if you give it 5 nm, it
+    stores 50 Å internally. Same idea for multipoles - they should be stored
+    in atomic units (AU).
+
+test_conformer_quantity
+    The record stores coordinates as plain numpy arrays (no units attached).
+    But when you ask for .conformer_quantity, it should give you back the
+    coordinates WITH the units attached (Angstroms). This test verifies that
+    conversion works correctly.
+
+test_multipoles_quantity
+    Same idea as above but for multipoles. The raw .multipoles is just numbers,
+    but .multipoles_quantity should return those numbers with AU units attached
+    so downstream code knows what units they're in.
+
+test_record_from_molecule
+    Instead of manually filling in all the record fields, you can call
+    MoleculeGDMARecord.from_molecule(molecule, conformer, multipoles, settings).
+    This test verifies that helper method correctly:
+    (1) generates the atom-mapped SMILES from the molecule,
+    (2) stores the conformer and multipoles, and
+    (3) preserves the settings you passed in.
+
+
+STORE DATABASE TESTS (MoleculeGDMAStore)
+--------------------------------------------------------------------------------
+
+test_db_version
+    When you create a new SQLite database for the first time, it should stamp
+    the database with a version number (e.g., DB_VERSION = 1). This lets the
+    code detect if someone tries to open an old database with newer code that
+    expects a different schema. The test creates a fresh store and checks that
+    the version number is written.
+
+test_provenance
+    Provenance = "where did this data come from?" The store lets you record
+    metadata like {"author": "John", "date": "2024-01-01"} and software versions
+    like {"psi4": "1.8.0"}. This test verifies you can set that info and read
+    it back later.
+
+test_db_invalid_version
+    If someone opens a database that was created with an older (or newer)
+    version of the code, it should raise an IncompatibleDBVersion error rather
+    than silently corrupting data. This test manually changes the DB version to
+    an old number and confirms the error is raised.
+
+test_tagged_to_canonical_smiles
+    Internally, the store converts atom-mapped SMILES like
+    [H:2][C:1]([H:3])([H:4])[H:5] to canonical SMILES like C for indexing. This
+    test checks that helper method works (it's used to group conformers of the
+    same molecule together).
+
+test_store
+    The basic "can I save data?" test. Create a store, call store(record1,
+    record2), then call list() and verify the molecules show up. This catches
+    database connection issues, schema problems, etc.
+
+test_unique_gdma_settings
+    If you store 10 records that all use the same settings (same basis, method,
+    etc.), the database shouldn't create 10 copies of those settings - it should
+    create 1 copy and have all 10 records point to it. This test stores
+    duplicate settings and verifies only one row exists in the settings table.
+    Saves space and enables efficient queries.
+
+test_gdma_settings_round_trip
+    Settings go through a conversion: GDMASettings (Python object) →
+    DBGDMASettings (database row) → GDMASettings (Python object again). This
+    test verifies nothing gets lost or corrupted in that round trip. For
+    example, the radius field is a list like ["C", 0.53, "N", 0.53] that gets
+    converted to a string for storage - this test makes sure it comes back as
+    the same list.
+
+test_retrieve
+    The "can I get my data back with filters?" test. Store several records with
+    different molecules, basis sets, and methods. Then test that
+    retrieve(smiles="CO") returns only methanol records,
+    retrieve(basis="def2-SVP") returns only records with that basis, and
+    combinations like retrieve(smiles="C", method="hf") work correctly.
+
+
+================================================================================
+                    DATA FLOW DIAGRAM
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────┐
+│  User runs GDMA calculation → gets multipoles                   │
+│                      ↓                                          │
+│  MoleculeGDMARecord.from_molecule() packages the data           │  ← test_record_from_molecule
+│                      ↓                                          │
+│  Record validates/converts units internally                     │  ← test_validate_quantity
+│                      ↓                                          │
+│  store.store(record) writes to SQLite                           │  ← test_store, test_unique_gdma_settings
+│                      ↓                                          │
+│  [Later] store.retrieve(smiles="CCO") loads it back             │  ← test_retrieve
+│                      ↓                                          │
+│  record.conformer_quantity returns data with units              │  ← test_conformer_quantity
+│                      ↓                                          │
+│  Data flows into MPFIT algorithm                                │
+└─────────────────────────────────────────────────────────────────┘
+
+If any of these steps silently corrupts data (wrong units, lost settings,
+mangled SMILES), the MPFIT charges will be wrong and it'll be very hard to
+debug. These tests catch those issues early.
+
+
+================================================================================
+                    IMPLEMENTATION ORDER (RECOMMENDED)
+================================================================================
+
+Phase 1: Record basics (get data in/out correctly)
+  1. test_record_from_molecule
+  2. test_validate_quantity
+  3. test_conformer_quantity
+  4. test_multipoles_quantity
+
+Phase 2: Store basics (database works)
+  5. test_db_version
+  6. test_store
+  7. test_retrieve
+
+Phase 3: Store robustness (edge cases)
+  8. test_provenance
+  9. test_db_invalid_version
+  10. test_tagged_to_canonical_smiles
+  11. test_unique_gdma_settings
+  12. test_gdma_settings_round_trip
