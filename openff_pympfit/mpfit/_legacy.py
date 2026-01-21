@@ -1,10 +1,13 @@
 import numpy as np
+from numpy.typing import NDArray
 
-def _print_multipole_moments(i, mm, lmax):
-    """
-    Print multipole moments for site i in a format similar to the original file
 
-    Parameters:
+def _print_multipole_moments(
+    i: int, mm: NDArray[np.float64], lmax: NDArray[np.int_]
+) -> None:
+    """Print multipole moments for site i in a format similar to the original file.
+
+    Parameters
     ----------
     i : int
         Site index
@@ -28,49 +31,48 @@ def _print_multipole_moments(i, mm, lmax):
 
         # Print components
         for j in range(1, l + 1):
+            qlc = f"Q{l}{j}c = {mm[i, l, j, 0]:10.6f}"
+            qls = f"Q{l}{j}s = {mm[i, l, j, 1]:10.6f}"
             if j == 1:
-                print(
-                    f"  Q{l}{j}c = {mm[i, l, j, 0]:10.6f}  Q{l}{j}s = {mm[i, l, j, 1]:10.6f}",
-                    end="",
-                )
+                print(f"  {qlc}  {qls}", end="")
             else:
                 # For j > 1, print on new line with spacing
                 if j == 2:
                     print()
-                print(
-                    f"                   Q{l}{j}c = {mm[i, l, j, 0]:10.6f}  Q{l}{j}s = {mm[i, l, j, 1]:10.6f}",
-                    end="",
-                )
+                print(f"                   {qlc}  {qls}", end="")
         print()
 
-def numbersites(inpfile):
+
+def numbersites(inpfile: str) -> int:
+    """Count the number of multipole sites in an input file."""
     count = 0
-    with open(inpfile, "r") as f:
+    with open(inpfile) as f:
         while True:
             line = f.readline()
             if not line:
                 break
             line_split = line.split()
             if len(line_split) >= 5:
-                _type = line_split[0]
-                x, y, z = map(float, line_split[1:4])
                 maxl = int(line_split[4])
-                for i in range(maxl + 1):
-                    skip_lines = f.readline()
+                for _ in range(maxl + 1):
+                    f.readline()  # skip multipole data lines
                 count += 1
     return count
 
 
 def getmultmoments(
-    inpfile,
-    n,
-    lmax,
-    mm,  # multipole moments
-    ms,  # multipole sites
-    atomtype,
-    reprint_mm=False,
-):
-    with open(inpfile, "r") as f:
+    inpfile: str,
+    n: int,
+    lmax: NDArray[np.int_],
+    mm: NDArray[np.float64],  # multipole moments
+    ms: NDArray[np.float64],  # multipole sites
+    atomtype: NDArray[np.str_],
+    reprint_mm: bool = False,
+) -> tuple[
+    NDArray[np.int_], NDArray[np.float64], NDArray[np.float64], NDArray[np.str_]
+]:
+    """Read multipole moments from input file into arrays."""
+    with open(inpfile) as f:
         for i in range(n):
             line = f.readline().split()
             atomtype[i] = line[0]
@@ -102,8 +104,10 @@ def getmultmoments(
     return lmax, mm, ms, atomtype
 
 
-def gencharges(ms, qs, midbond):
-    """Generate charge positions from multipole sites and bond information"""
+def gencharges(
+    ms: NDArray[np.float64], qs: NDArray[np.float64], midbond: NDArray[np.int_]
+) -> NDArray[np.float64]:
+    """Generate charge positions from multipole sites and bond information."""
     nmult = ms.shape[0]  # number of multipole sites
     nmid = qs.shape[0] - nmult  # number of midpoints
 

@@ -1,18 +1,17 @@
-"""This module contains classes which are able to store and retrieve
-calculated distributed multipole analysis (GDMA) data in unified data collections.
-"""
+"""Store and retrieve calculated GDMA data in unified data collections."""
 
-import warnings
 import functools
+import warnings
 from collections import defaultdict
-from contextlib import contextmanager
-from typing import ContextManager
+from contextlib import AbstractContextManager, contextmanager
 
-from openff.toolkit import Quantity, Molecule
-from pydantic import BaseModel, Field, ConfigDict
+from openff.toolkit import Molecule, Quantity
+from openff.toolkit.utils.exceptions import AtomMappingWarning
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
-from openff.toolkit.utils.exceptions import AtomMappingWarning
+
+from openff_pympfit._annotations import MP, Coordinates
 from openff_pympfit.gdma import GDMASettings
 from openff_pympfit.gdma.storage.db import (
     DB_VERSION,
@@ -25,17 +24,14 @@ from openff_pympfit.gdma.storage.db import (
     DBSoftwareProvenance,
 )
 from openff_pympfit.gdma.storage.exceptions import IncompatibleDBVersion
-from openff_pympfit._annotations import (
-    MP,
-    Coordinates,
-)
 
 
 class MoleculeGDMARecord(BaseModel):
-    """A record which contains information about the molecule that the distributed
-    multipole analysis was performed for (including the exact conformer coordinates),
-    provenance about how the GDMA was calculated, and the values of the multipoles
-    for each atom."""
+    """Record containing GDMA results for a molecule conformer.
+
+    Includes molecule information, conformer coordinates, GDMA settings
+    provenance, and multipole values for each atom.
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -77,8 +73,9 @@ class MoleculeGDMARecord(BaseModel):
         multipoles: Quantity,
         gdma_settings: GDMASettings,
     ) -> "MoleculeGDMARecord":
-        """Creates a new ``MoleculeGDMARecord`` from an existing molecule
-        object, taking care of creating the InChI and SMARTS representations.
+        """Create a new ``MoleculeGDMARecord`` from an existing molecule.
+
+        Takes care of creating the InChI and SMARTS representations.
 
         Parameters
         ----------
@@ -95,7 +92,6 @@ class MoleculeGDMARecord(BaseModel):
         -------
             The created record.
         """
-
         tagged_smiles = molecule.to_smiles(
             isomeric=True, explicit_hydrogens=True, mapped=True
         )
@@ -109,11 +105,9 @@ class MoleculeGDMARecord(BaseModel):
 
 
 class MoleculeGDMAStore:
-    """A class used to store the distributed multipole analysis (GDMA) results
-    for multiple molecules in multiple conformers, as well as to retrieve and
-    query this stored data.
+    """Store and retrieve GDMA results for molecules in multiple conformers.
 
-    This class currently can only store the data in a SQLite data base.
+    This class currently can only store the data in a SQLite database.
     """
 
     @property
@@ -147,8 +141,8 @@ class MoleculeGDMAStore:
         self,
         database_path: str = "gdma-store.sqlite",
         cache_size: None | int = None,
-    ):
-        """
+    ) -> None:
+        """Initialize the GDMA store.
 
         Parameters
         ----------
@@ -165,7 +159,9 @@ class MoleculeGDMAStore:
         if cache_size:
 
             @event.listens_for(self._engine, "connect")
-            def set_sqlite_pragma(dbapi_connection, connection_record):
+            def set_sqlite_pragma(
+                dbapi_connection: object, _connection_record: object
+            ) -> None:
                 cursor = dbapi_connection.cursor()
                 cursor.execute(
                     f"PRAGMA cache_size = -{cache_size}"
@@ -197,7 +193,7 @@ class MoleculeGDMAStore:
         self,
         general_provenance: dict[str, str],
         software_provenance: dict[str, str],
-    ):
+    ) -> None:
         """Set the stores provenance information.
 
         Parameters
@@ -210,7 +206,6 @@ class MoleculeGDMAStore:
             A dictionary storing the provenance of the software and packages used
             to generate the data in the store.
         """
-
         with self._get_session() as db:
             db_info: DBInformation = db.query(DBInformation).first()
             db_info.general_provenance = [
@@ -223,15 +218,15 @@ class MoleculeGDMAStore:
             ]
 
     @contextmanager
-    def _get_session(self) -> ContextManager[Session]:
+    def _get_session(self) -> AbstractContextManager[Session]:
         session = self._session_maker()
 
         try:
             yield session
             session.commit()
-        except BaseException as e:
+        except BaseException:
             session.rollback()
-            raise e
+            raise
         finally:
             session.close()
 
@@ -239,8 +234,7 @@ class MoleculeGDMAStore:
     def _db_records_to_model(
         cls, db_records: list[DBMoleculeRecord]
     ) -> list[MoleculeGDMARecord]:
-        """Maps a set of database records into their corresponding
-        data models.
+        """Map a set of database records into their corresponding data models.
 
         Parameters
         ----------
@@ -257,9 +251,7 @@ class MoleculeGDMAStore:
                 tagged_smiles=db_conformer.tagged_smiles,
                 conformer=db_conformer.coordinates,
                 multipoles=db_conformer.multipoles,
-                gdma_settings=DBGDMASettings.db_to_instance(
-                    db_conformer.gdma_settings
-                ),
+                gdma_settings=DBGDMASettings.db_to_instance(db_conformer.gdma_settings),
             )
             for db_record in db_records
             for db_conformer in db_record.conformers
@@ -269,8 +261,7 @@ class MoleculeGDMAStore:
     def _store_smiles_records(
         cls, db: Session, smiles: str, records: list[MoleculeGDMARecord]
     ) -> DBMoleculeRecord:
-        """Stores a set of records which all store information for the same
-        molecule.
+        """Store a set of records which all store information for the same molecule.
 
         Parameters
         ----------
@@ -281,7 +272,6 @@ class MoleculeGDMAStore:
         records
             The records to store.
         """
-
         existing_db_molecule = (
             db.query(DBMoleculeRecord).filter(DBMoleculeRecord.smiles == smiles).first()
         )
@@ -311,8 +301,7 @@ class MoleculeGDMAStore:
     @classmethod
     @functools.lru_cache(10000)
     def _tagged_to_canonical_smiles(cls, tagged_smiles: str) -> str:
-        """Converts a smiles pattern which contains atom indices into
-        a canonical smiles pattern without indices.
+        """Convert a smiles pattern with atom indices to canonical smiles.
 
         Parameters
         ----------
@@ -327,15 +316,12 @@ class MoleculeGDMAStore:
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=AtomMappingWarning)
-            smiles = Molecule.from_smiles(
+            return Molecule.from_smiles(
                 tagged_smiles, allow_undefined_stereo=True
             ).to_smiles(isomeric=False, explicit_hydrogens=False, mapped=False)
 
-        return smiles
-
-    def store(self, *records: MoleculeGDMARecord):
-        """Store the distributed multipole analysis (GDMA) calculated for
-        a given molecule in the data store.
+    def store(self, *records: MoleculeGDMARecord) -> None:
+        """Store the GDMA calculated for a given molecule in the data store.
 
         Parameters
         ----------
@@ -346,20 +332,19 @@ class MoleculeGDMAStore:
         -------
             The records as they appear in the store.
         """
-
-        # Validate an re-partition the records by their smiles patterns.
+        # Validate and re-partition the records by their smiles patterns.
         records_by_smiles: dict[str, list[MoleculeGDMARecord]] = defaultdict(list)
 
         for record in records:
-            record = MoleculeGDMARecord(**record.dict())
-            smiles = self._tagged_to_canonical_smiles(record.tagged_smiles)
+            validated_record = MoleculeGDMARecord(**record.dict())
+            smiles = self._tagged_to_canonical_smiles(validated_record.tagged_smiles)
 
-            records_by_smiles[smiles].append(record)
+            records_by_smiles[smiles].append(validated_record)
 
         # Store the records.
         with self._get_session() as db:
-            for smiles in records_by_smiles:
-                self._store_smiles_records(db, smiles, records_by_smiles[smiles])
+            for smiles, smiles_records in records_by_smiles.items():
+                self._store_smiles_records(db, smiles, smiles_records)
 
     def retrieve(
         self,
@@ -367,9 +352,10 @@ class MoleculeGDMAStore:
         basis: str | None = None,
         method: str | None = None,
     ) -> list[MoleculeGDMARecord]:
-        """Retrieve records stored in this data store, optionally
-        according to a set of filters."""
+        """Retrieve records stored in this data store.
 
+        Optionally filters according to a set of criteria.
+        """
         with self._get_session() as db:
             db_records = db.query(DBMoleculeRecord)
 
@@ -400,14 +386,14 @@ class MoleculeGDMAStore:
                 ]
             if method:
                 records = [
-                    record for record in records if record.gdma_settings.method == method
+                    record
+                    for record in records
+                    if record.gdma_settings.method == method
                 ]
 
             return records
 
     def list(self) -> list[str]:
-        """Lists the molecules which exist in and may be retrieved from the
-        store."""
-
+        """List the molecules which exist in and may be retrieved from the store."""
         with self._get_session() as db:
             return [smiles for (smiles,) in db.query(DBMoleculeRecord.smiles).all()]

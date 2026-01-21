@@ -1,25 +1,22 @@
-import numpy
-from openff.toolkit.topology import Molecule
+import numpy as np
 
 # From openff-recharge (dependency)
-from openff.recharge.charges.library import (
-    LibraryChargeCollection,
-    LibraryChargeGenerator,
-)
 from openff.recharge.utilities.molecule import extract_conformers
+from openff.toolkit.topology import Molecule
 
-# From openff-pympfit
-from openff_pympfit.mpfit import generate_mpfit_charge_parameter
-from openff_pympfit.mpfit.solvers import MPFITSVDSolver
 from openff_pympfit.gdma import GDMASettings
 from openff_pympfit.gdma.psi4 import Psi4GDMAGenerator
 from openff_pympfit.gdma.storage import MoleculeGDMARecord
 
+# From openff-pympfit
+from openff_pympfit.mpfit import generate_mpfit_charge_parameter
+from openff_pympfit.mpfit.solvers import MPFITSVDSolver
+
 
 def main():
     qc_data_settings = GDMASettings(
-        #method="pbe0",
-        #basis="def2-SVP",
+        # method="pbe0",
+        # basis="def2-SVP",
     )
 
     molecule: Molecule = Molecule.from_mapped_smiles(
@@ -32,15 +29,15 @@ def main():
     conformer, mp = Psi4GDMAGenerator.generate(
         molecule, input_conformer, qc_data_settings, minimize=True
     )
-    
+
     qc_data_record = MoleculeGDMARecord.from_molecule(
-       molecule, conformer, mp, qc_data_settings
+        molecule, conformer, mp, qc_data_settings
     )
     print("Multipole moments shape:", mp.shape)
     mpfit_solver = MPFITSVDSolver(svd_threshold=1.0e-4)
 
     mpfit_charge_parameter = generate_mpfit_charge_parameter(
-       [qc_data_record], mpfit_solver
+        [qc_data_record], mpfit_solver
     )
     # TODO: Fix tolerance issue with conda openff-recharge 0.5.3 vs fork
     # mpfit_charges = LibraryChargeGenerator.generate(
@@ -48,8 +45,8 @@ def main():
     # )
 
     print(f"MPFIT SMILES         : {mpfit_charge_parameter.smiles}")
-    print(f"MPFIT VALUES (UNIQUE): {numpy.round(mpfit_charge_parameter.value, 4)}")
-    print("")
+    print(f"MPFIT VALUES (UNIQUE): {np.round(mpfit_charge_parameter.value, 4)}")
+    print()
 
     # Print each atom with its corresponding charge
     print("Atom-by-atom charges:")

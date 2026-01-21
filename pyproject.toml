@@ -87,24 +87,72 @@ default-tag = "1.0.0"
 file = "openff_pympfit/_version.py"
 
 [tool.ruff]
+target-version = "py310"
+output-format = "concise"
 line-length = 88
-exclude = ["openff_pympfit/tests/", "openff_pympfit/_version.py"]
+exclude = ["openff_pympfit/_version.py"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "B", "C", "I"]
-ignore = ["E203", "E266", "E501", "W503", "B905", "B902", "E704"]
-
-[tool.ruff.lint.isort]
-known-third-party = [
-    "click",
-    "jinja2",
-    "numpy",
-    "openeye",
-    "pydantic",
-    "scipy",
-    "sqlalchemy",
-    "typing_extensions",
+select = ["ALL"]
+ignore = [
+    "ANN002",  # Missing type annotation for *arg
+    "ANN003",  # Missing type annotation for **kwargs
+    "ANN401",  # typing.Any disallowed
+    "ARG002",  # unused method argument
+    "C408",    # Unnecessary (dict/list/tuple) call - remove call
+    "C901",    # function too complex
+    "COM812",  # trailing comma missing
+    "EM",      # exception message must not use f-string literal
+    "ERA001",  # found commented out code
+    "FBT001",  # boolean positional arg in function definition
+    "FBT002",  # boolean default value in function definition
+    "FIX002",  # line contains TODO
+    "G004",    # logging uses f-string
+    "ISC001",  # implicit string concatenation
+    "PD011",   # pandas-use-of-dot-values
+    "PERF203", # try-except-in-loop
+    "PLC0415", # imports not at top level are OK
+    "PLR0911", # too many returns
+    "PLR0912", # too many branches
+    "PLR0913", # too many arguments
+    "PLR0915", # too many local statements
+    "PLR2004", # magic value comparison
+    "PT006",   # pytest-parametrize-names-wrong-type
+    "PT013",   # pytest-incorrect-pytest-import
+    "PTH",     # prefer Pathlib to os.path
+    "RUF013",  # implicit-optional
+    "S324",    # use of insecure hash function
+    "S507",    # paramiko auto trust
+    "S603",    # use of insecure subprocess
+    "TD",      # todos
+    "TRY003",  # long message outside exception class
+    "SLF001",  # private member access (using internal _classes is fine in own codebase)
 ]
+pydocstyle.convention = "numpy"
+isort.known-first-party = ["openff_pympfit"]
+isort.split-on-trailing-comma = false
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"**/tests/*" = ["ANN", "ARG001", "D", "INP001", "PLR2004", "S101"]
+"docs/*" = ["INP001", "D100", "A001"]
+# Devtools: MolSSI cookiecutter template scripts
+"devtools/*" = ["ANN", "B904", "D", "E501", "INP001", "T201", "S602"]
+# Examples: demonstration scripts with intentional print
+"examples/*" = ["ANN", "D", "INP001", "T201"]
+# Legacy file: l is physics convention for angular momentum, print is intentional
+"openff_pympfit/mpfit/_legacy.py" = ["E741", "T201"]
+# Core math: l/m are quantum numbers, A/Y/W are standard physics notation
+"openff_pympfit/mpfit/core.py" = ["E741", "N802", "N803", "N806"]
+# Solvers: U/S/Vh are SVD notation, TRY301 raises in try are intentional
+"openff_pympfit/mpfit/solvers.py" = ["N806", "TRY301"]
+# Optimize: A_matrix/site_A/site_b are standard physics matrix notation
+"openff_pympfit/optimize/_optimize.py" = ["N806"]
+# Psi4: S607 partial executable path is intentional (psi4 expected in PATH)
+"openff_pympfit/gdma/psi4.py" = ["S607"]
 
 [tool.coverage.run]
 omit = [

@@ -1,16 +1,15 @@
-"""Compute GDMA and multipole data using Psi4"""
+"""Compute GDMA and multipole data using Psi4."""
 
 import os
 import subprocess
 from typing import TYPE_CHECKING
 
 import jinja2
-import numpy
-from openff.units import unit, Quantity
+import numpy as np
+from openff.recharge.esp.exceptions import Psi4Error
+from openff.units import Quantity, unit
 from openff.units.elements import SYMBOLS
 from openff.utilities import get_data_file_path, temporary_cd
-
-from openff.recharge.esp.exceptions import Psi4Error
 
 from openff_pympfit.gdma import GDMAGenerator, GDMASettings
 
@@ -19,9 +18,7 @@ if TYPE_CHECKING:
 
 
 class Psi4GDMAGenerator(GDMAGenerator):
-    """An class which will compute the multipole moments of
-    a molecule using Psi4.
-    """
+    """Compute the multipole moments of a molecule using Psi4."""
 
     @classmethod
     def _generate_input(
@@ -106,11 +103,8 @@ class Psi4GDMAGenerator(GDMAGenerator):
             "memory": f"{memory:~P}",
         }
 
-        rendered_template = template.render(template_inputs)
         # Remove the white space after the for loop
-        rendered_template = rendered_template.replace("  \n}", "}")
-
-        return rendered_template
+        return template.render(template_inputs).replace("  \n}", "}")
 
     @classmethod
     def _generate(
@@ -118,14 +112,14 @@ class Psi4GDMAGenerator(GDMAGenerator):
         molecule: "Molecule",
         conformer: Quantity,
         settings: GDMASettings,
-        directory: str,
+        _directory: str,
         minimize: bool,
         compute_mp: bool,
         n_threads: int,
         memory: Quantity = 500 * unit.mebibytes,
     ) -> tuple[Quantity, Quantity | None, Quantity | None]:
         # Perform the calculation in a temporary directory
-        with temporary_cd("./"):#directory):
+        with temporary_cd("./"):  # directory):
             # Store the input file.
             input_contents = cls._generate_input(
                 molecule,
@@ -141,7 +135,7 @@ class Psi4GDMAGenerator(GDMAGenerator):
 
             # Attempt to run the calculation
             psi4_process = subprocess.Popen(
-                ["psi4",  "--nthread", str(n_threads), "input.dat", "output.dat"],
+                ["psi4", "--nthread", str(n_threads), "input.dat", "output.dat"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
@@ -153,13 +147,13 @@ class Psi4GDMAGenerator(GDMAGenerator):
                 raise Psi4Error(std_output.decode(), std_error.decode())
 
             if compute_mp:
-                mp = numpy.load('dma_distributed.npy')
+                mp = np.load("dma_distributed.npy")
 
             with open("final-geometry.xyz") as file:
-                output_lines = file.read().splitlines(False)
+                output_lines = file.read().splitlines(keepends=False)
 
             final_coordinates = (
-                numpy.array(
+                np.array(
                     [
                         [
                             float(coordinate)
