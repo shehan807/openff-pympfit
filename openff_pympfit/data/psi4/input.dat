@@ -11,7 +11,7 @@ molecule mol {
 
 set {
   basis {{ basis }}
-  
+{%- if compute_mp %}
   # GDMA options
   gdma_limit    {{ limit }}
   gdma_multipole_units {{ multipole_units }}
@@ -21,6 +21,7 @@ set {
   {% if gdma_origin -%}
   gdma_origin   {{ gdma_origin }}
   {% endif -%}
+{%- endif %}
 }
 
 {%- if minimize %}
@@ -30,12 +31,15 @@ optimize('{{ method }}')
 # Calculate the wavefunction
 energy, wfn = energy('{{ method }}', return_wfn=True)
 
+{%- if compute_mp %}
 # Run GDMA
 gdma(wfn)
+{%- endif %}
 
 # Save final geometry
 mol.save_xyz_file('final-geometry.xyz', 1)
 
+{%- if compute_mp %}
 # Get GDMA results
 dma_distributed = variable("DMA DISTRIBUTED MULTIPOLES")
 dma_total = variable("DMA TOTAL MULTIPOLES")
@@ -49,3 +53,4 @@ dma_total_array = dma_total.to_array()
 # Save arrays to disk
 np.save('dma_distributed.npy', dma_distributed_array)
 np.save('dma_total.npy', dma_total_array)
+{%- endif %}

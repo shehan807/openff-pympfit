@@ -99,6 +99,7 @@ class Psi4GDMAGenerator(GDMAGenerator):
             "radius": settings.radius,
             "switch": settings.switch,
             "minimize": minimize,
+            "compute_mp": compute_mp,
             "properties": str(properties),
             "memory": f"{memory:~P}",
         }
@@ -146,6 +147,7 @@ class Psi4GDMAGenerator(GDMAGenerator):
             if exit_code != 0:
                 raise Psi4Error(std_output.decode(), std_error.decode())
 
+            mp = None
             if compute_mp:
                 mp = np.load("dma_distributed.npy")
 
