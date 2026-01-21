@@ -1,18 +1,11 @@
-"""Utilities for storing GDMA data in a SQLite database"""
+"""Utilities for storing GDMA data in a SQLite database."""
 
 import abc
 import math
 from typing import TypeVar
 
-from sqlalchemy import (
-    Column,
-    ForeignKey,
-    Integer,
-    PickleType,
-    String,
-    UniqueConstraint,
-)
-from sqlalchemy.orm import Query, Session, relationship, declarative_base
+from sqlalchemy import Column, ForeignKey, Integer, PickleType, String, UniqueConstraint
+from sqlalchemy.orm import Query, Session, declarative_base, relationship
 
 from openff_pympfit.gdma import GDMASettings
 
@@ -34,34 +27,33 @@ def _db_int_to_float(value: int) -> float:
 
 
 class _UniqueMixin:
-    """A base class for records which should be unique in the
-    database."""
+    """Base class for records which should be unique in the database."""
 
     @classmethod
     @abc.abstractmethod
     def _hash(cls, instance: _InstanceType) -> int:
-        """Returns the hash of the instance that this record represents."""
-        raise NotImplementedError()
+        """Return the hash of the instance that this record represents."""
+        raise NotImplementedError
 
     @classmethod
     @abc.abstractmethod
     def _query(cls, db: Session, instance: _InstanceType) -> Query:
-        """Returns a query which should find existing copies of an instance."""
-        raise NotImplementedError()
+        """Return a query which should find existing copies of an instance."""
+        raise NotImplementedError
 
     @classmethod
     @abc.abstractmethod
     def _instance_to_db(cls, instance: _InstanceType) -> _DBInstanceType:
         """Map an instance into a database version of itself."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @classmethod
     def unique(cls, db: Session, instance: _InstanceType) -> _DBInstanceType:
-        """Creates a new database object from the specified instance if it
-        does not already exist on the database, otherwise the existing
+        """Create a new database object from the instance if it doesn't exist.
+
+        If the instance already exists on the database, the existing
         instance is returned.
         """
-
         cache = getattr(db, "_unique_cache", None)
 
         if cache is None:
@@ -84,6 +76,8 @@ class _UniqueMixin:
 
 
 class DBGDMASettings(_UniqueMixin, DBBase):
+    """Database representation of GDMASettings."""
+
     __tablename__ = "gdma_settings"
     __table_args__ = (UniqueConstraint("basis", "method"),)
 
@@ -95,7 +89,7 @@ class DBGDMASettings(_UniqueMixin, DBBase):
     limit = Column(Integer, nullable=False)
     multipole_units = Column(String, nullable=False)
     switch = Column(Integer, nullable=False)
-    
+
     # Radius will be stored as a string representation of the list
     radius = Column(String, nullable=False)
 
@@ -103,12 +97,12 @@ class DBGDMASettings(_UniqueMixin, DBBase):
     def _hash(cls, instance: GDMASettings) -> int:
         return hash(
             (
-                instance.basis, 
-                instance.method, 
+                instance.basis,
+                instance.method,
                 instance.limit,
                 instance.multipole_units,
                 _float_to_db_int(instance.switch),
-                str(instance.radius)
+                str(instance.radius),
             )
         )
 
@@ -116,7 +110,7 @@ class DBGDMASettings(_UniqueMixin, DBBase):
     def _query(cls, db: Session, instance: GDMASettings) -> Query:
         switch = _float_to_db_int(instance.switch)
         radius = str(instance.radius)
-        
+
         return (
             db.query(DBGDMASettings)
             .filter(DBGDMASettings.basis == instance.basis)
@@ -135,16 +129,17 @@ class DBGDMASettings(_UniqueMixin, DBBase):
             limit=instance.limit,
             multipole_units=instance.multipole_units,
             switch=_float_to_db_int(instance.switch),
-            radius=str(instance.radius)
+            radius=str(instance.radius),
         )
 
     @classmethod
     def db_to_instance(cls, db_instance: "DBGDMASettings") -> GDMASettings:
+        """Convert a database record to a GDMASettings instance."""
         import ast
-        
+
         # Convert the radius string back to a list
         radius_list = ast.literal_eval(db_instance.radius)
-        
+
         # noinspection PyTypeChecker
         return GDMASettings(
             basis=db_instance.basis,
@@ -152,11 +147,13 @@ class DBGDMASettings(_UniqueMixin, DBBase):
             limit=db_instance.limit,
             multipole_units=db_instance.multipole_units,
             switch=_db_int_to_float(db_instance.switch),
-            radius=radius_list
+            radius=radius_list,
         )
 
 
 class DBConformerRecord(DBBase):
+    """Database representation of a conformer record."""
+
     __tablename__ = "conformers"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -172,6 +169,8 @@ class DBConformerRecord(DBBase):
 
 
 class DBMoleculeRecord(DBBase):
+    """Database representation of a molecule record."""
+
     __tablename__ = "molecules"
 
     smiles = Column(String, primary_key=True, index=True)
@@ -179,6 +178,8 @@ class DBMoleculeRecord(DBBase):
 
 
 class DBGeneralProvenance(DBBase):
+    """Database representation of general provenance information."""
+
     __tablename__ = "general_provenance"
 
     key = Column(String, primary_key=True, index=True, unique=True)
@@ -188,6 +189,8 @@ class DBGeneralProvenance(DBBase):
 
 
 class DBSoftwareProvenance(DBBase):
+    """Database representation of software provenance information."""
+
     __tablename__ = "software_provenance"
 
     key = Column(String, primary_key=True, index=True, unique=True)
@@ -197,9 +200,7 @@ class DBSoftwareProvenance(DBBase):
 
 
 class DBInformation(DBBase):
-    """A class which keeps track of the current database
-    settings.
-    """
+    """Track current database settings and version."""
 
     __tablename__ = "db_info"
 

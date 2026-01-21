@@ -1,39 +1,24 @@
-from typing import TYPE_CHECKING
 from collections.abc import Generator
 
-import numpy
-from openff.units import unit
-
-from openff.recharge.charges.library import (
-    LibraryChargeCollection,
-    LibraryChargeGenerator,
-)
+import numpy as np
+from openff.recharge.charges.library import LibraryChargeCollection
 from openff.recharge.charges.qc import QCChargeGenerator, QCChargeSettings
 from openff.recharge.charges.vsite import (
     VirtualSiteChargeKey,
     VirtualSiteCollection,
-    VirtualSiteGenerator,
     VirtualSiteGeometryKey,
 )
+from openff.recharge.optimize._optimize import Objective, ObjectiveTerm
+from openff.units import unit
+
 from openff_pympfit.gdma.storage import MoleculeGDMARecord
-from openff.recharge.utilities.tensors import (
-    TensorType,
-    append_zero,
-    concatenate,
-    to_numpy,
-    to_torch,
-)
 
-from openff.recharge.optimize._optimize import ObjectiveTerm, Objective
-
-if TYPE_CHECKING:
-    from openff.toolkit import Molecule
 
 class MPFITObjectiveTerm(ObjectiveTerm):
-    """A class that stores precalculated values used to compute the difference between
-    a reference set of distributed multipole moments and a set computed using a set of fixed
-    partial charges.
+    """Store precalculated values for multipole moment fitting.
 
+    Computes the difference between a reference set of distributed multipole
+    moments and a set computed using fixed partial charges.
     See the ``predict`` and ``loss`` functions for more details.
     """
 
@@ -43,10 +28,11 @@ class MPFITObjectiveTerm(ObjectiveTerm):
 
 
 class MPFITObjective(Objective):
-    """A utility class which contains helper functions for computing the
-    contributions to a least squares objective function which captures the
-    deviation of multipole moments computed using molecular partial charges and the  
-    multipole moments from GDMA calculations."""
+    """Compute contributions to the MPFIT least squares objective function.
+
+    Contains helper functions for capturing the deviation of multipole moments
+    computed using molecular partial charges from GDMA calculations.
+    """
 
     @classmethod
     def _objective_term(cls) -> type[MPFITObjectiveTerm]:
@@ -58,24 +44,25 @@ class MPFITObjective(Objective):
 
     @classmethod
     def _compute_design_matrix_precursor(
-        cls, grid_coordinates: numpy.ndarray, conformer: numpy.ndarray
-    ):
-        """For MPFIT, the design matrix precursor is calculated differently than for ESP or
-        electric fields. Instead of grid coordinates, we use the molecular coordinates and
-        build a matrix that maps charges to multipole moments.
-        
-        The implementation needs to construct the A matrix as described in 
-        J. Comp. Chem. Vol. 12, No. 8, 913-917 (1991)
-        """
-        from openff_pympfit.mpfit.core import _regular_solid_harmonic, build_A_matrix
+        cls, _grid_coordinates: np.ndarray, conformer: np.ndarray
+    ) -> np.ndarray:
+        """Build design matrix precursor for MPFIT.
 
+        For MPFIT, the design matrix precursor is calculated differently than
+        for ESP or electric fields. We use molecular coordinates to build a
+        matrix that maps charges to multipole moments.
+
+        The implementation constructs the A matrix as described in
+        J. Comp. Chem. Vol. 12, No. 8, 913-917 (1991).
+        """
         # For MPFIT, we build the design matrix directly in compute_objective_terms
         # This is a placeholder to satisfy the interface
-        return numpy.ones((1, conformer.shape[0]))
+        return np.ones((1, conformer.shape[0]))
 
     @classmethod
-    def _electrostatic_property(cls, record: MoleculeGDMARecord) -> numpy.ndarray:
+    def _electrostatic_property(cls, record: MoleculeGDMARecord) -> np.ndarray:
         from openff_pympfit.mpfit.core import _convert_flat_to_hierarchical
+
         # Convert flat multipoles to hierarchical format for the solver
         # Determine the number of sites and max rank from the multipoles array
         flat_multipoles = record.multipoles
@@ -84,7 +71,7 @@ class MPFITObjective(Objective):
 
         # Convert from flat to hierarchical format
         return _convert_flat_to_hierarchical(flat_multipoles, num_sites, max_rank)
-        
+
     @classmethod
     def compute_objective_terms(
         cls,
@@ -92,8 +79,8 @@ class MPFITObjective(Objective):
         charge_collection: None | (QCChargeSettings | LibraryChargeCollection) = None,
         charge_parameter_keys: list[tuple[str, tuple[int, ...]]] | None = None,
         vsite_collection: VirtualSiteCollection | None = None,
-        vsite_charge_parameter_keys: list[VirtualSiteChargeKey] | None = None,
-        vsite_coordinate_parameter_keys: list[VirtualSiteGeometryKey] | None = None,
+        _vsite_charge_parameter_keys: list[VirtualSiteChargeKey] | None = None,
+        _vsite_coordinate_parameter_keys: list[VirtualSiteGeometryKey] | None = None,
         return_quse_masks: bool = False,
     ) -> Generator[tuple[MPFITObjectiveTerm, dict] | MPFITObjectiveTerm, None, None]:
         """Pre-calculates the terms that contribute to the total objective function.
@@ -104,15 +91,20 @@ class MPFITObjective(Objective):
         For complete documentation, see the original method in the Objective class.
         Note: BCC parameters are not applicable for MPFIT and have been removed.
         """
-        from openff_pympfit.mpfit.core import build_A_matrix, build_b_vector, _convert_flat_to_hierarchical
         from openff.toolkit import Molecule
+
+        from openff_pympfit.mpfit.core import (
+            _convert_flat_to_hierarchical,
+            build_A_matrix,
+            build_b_vector,
+        )
 
         for gdma_record in gdma_records:
             molecule: Molecule = Molecule.from_mapped_smiles(
                 gdma_record.tagged_smiles, allow_undefined_stereo=True
             )
             conformer = gdma_record.conformer
-            
+
             # Get MPFIT settings from the record
             gdma_settings = gdma_record.gdma_settings
             max_rank = gdma_settings.limit
@@ -123,23 +115,25 @@ class MPFITObjective(Objective):
             # Convert the flat multipoles to hierarchical format
             flat_multipoles = gdma_record.multipoles
             num_sites = flat_multipoles.shape[0]
-            multipoles = _convert_flat_to_hierarchical(flat_multipoles, num_sites, max_rank)
+            multipoles = _convert_flat_to_hierarchical(
+                flat_multipoles, num_sites, max_rank
+            )
 
-            fixed_atom_charges = numpy.zeros((molecule.n_atoms, 1))
+            fixed_atom_charges = np.zeros((molecule.n_atoms, 1))
             atom_charge_design_matrices = []
 
             # We'll use the molecular coordinates as our design matrix precursor
             # This is just a placeholder to match the interface
-            design_matrix_precursor = cls._compute_design_matrix_precursor(
+            _design_matrix_precursor = cls._compute_design_matrix_precursor(
                 None, conformer
             )
 
             if charge_collection is None:
                 pass
             elif isinstance(charge_collection, QCChargeSettings):
-                assert (
-                    charge_parameter_keys is None
-                ), "charges generated using `QCChargeSettings` cannot be trained"
+                if charge_parameter_keys is not None:
+                    msg = "charges generated using `QCChargeSettings` cannot be trained"
+                    raise ValueError(msg)
 
                 fixed_atom_charges += QCChargeGenerator.generate(
                     molecule, [conformer * unit.angstrom], charge_collection
@@ -159,12 +153,10 @@ class MPFITObjective(Objective):
 
                 # Convert conformer from Angstroms to Bohrs once
                 bohr_conformer = unit.convert(conformer, unit.angstrom, unit.bohr)
-                
+
                 # Create rvdw array using the configured default atom radius
-                rvdw = numpy.full(molecule.n_atoms, default_atom_radius)
-                
-                # Build the A matrix that maps charges to multipole moments
-                A_matrix = numpy.zeros((molecule.n_atoms, library_assignment_matrix.shape[1]))
+                rvdw = np.full(molecule.n_atoms, default_atom_radius)
+
                 # Compute the reference values (b vector)
                 if cls._flatten_charges():
                     fixed_atom_charges = fixed_atom_charges.flatten()
@@ -176,18 +168,18 @@ class MPFITObjective(Objective):
                 # Process each atom site
                 for i in range(molecule.n_atoms):
                     # Calculate distances from current multipole site to all atoms
-                    rqm = numpy.linalg.norm(bohr_conformer[i] - bohr_conformer, axis=1)
+                    rqm = np.linalg.norm(bohr_conformer[i] - bohr_conformer, axis=1)
                     # Create mask for atoms within rvdw
                     quse_mask = rqm < rvdw[i]
 
                     # Store the mask for later use by the solver
                     quse_masks.append(quse_mask)
 
-                    qsites = numpy.count_nonzero(quse_mask)
+                    qsites = np.count_nonzero(quse_mask)
 
                     # Build the A matrix for this site's multipoles
-                    site_A = numpy.zeros((qsites, qsites))
-                    site_b = numpy.zeros(qsites)
+                    site_A = np.zeros((qsites, qsites))
+                    site_b = np.zeros(qsites)
 
                     # Apply the mask to get charge positions to use
                     masked_charge_conformer = bohr_conformer[quse_mask]
@@ -196,25 +188,43 @@ class MPFITObjective(Objective):
                     if masked_charge_conformer.shape[0] == 0:
                         masked_charge_conformer = bohr_conformer
                         # Update the mask to include all atoms
-                        quse_masks[-1] = numpy.ones(molecule.n_atoms, dtype=bool)
-                    
+                        quse_masks[-1] = np.ones(molecule.n_atoms, dtype=bool)
+
                     # Use the multipole site coordinates and masked charge coordinates
-                    site_A = build_A_matrix(i, bohr_conformer, masked_charge_conformer, r1, r2, max_rank, site_A)
-                    site_b = build_b_vector(i, bohr_conformer, masked_charge_conformer, r1, r2, max_rank, multipoles, site_b)
-                
+                    site_A = build_A_matrix(
+                        i,
+                        bohr_conformer,
+                        masked_charge_conformer,
+                        r1,
+                        r2,
+                        max_rank,
+                        site_A,
+                    )
+                    site_b = build_b_vector(
+                        i,
+                        bohr_conformer,
+                        masked_charge_conformer,
+                        r1,
+                        r2,
+                        max_rank,
+                        multipoles,
+                        site_b,
+                    )
+
                     atom_charge_design_matrices.append(site_A)
                     reference_values.append(site_b)
             else:
-                raise NotImplementedError()
+                raise NotImplementedError
 
             # We don't currently support virtual sites for MPFIT
             if vsite_collection is not None:
                 raise NotImplementedError("Virtual sites are not supported for MPFIT")
 
-            atom_charge_design_matrix = numpy.array(atom_charge_design_matrices, dtype=object)
-            reference_values = numpy.array(reference_values, dtype=object)
-            quse_masks = numpy.array(quse_masks, dtype=object)
-
+            atom_charge_design_matrix = np.array(
+                atom_charge_design_matrices, dtype=object
+            )
+            reference_values = np.array(reference_values, dtype=object)
+            quse_masks = np.array(quse_masks, dtype=object)
 
             objective_term = cls._objective_term()(
                 atom_charge_design_matrix,
@@ -229,6 +239,6 @@ class MPFITObjective(Objective):
 
             if return_quse_masks:
                 # Return the quse_masks along with the objective term
-                yield objective_term, {'quse_masks': quse_masks}
+                yield objective_term, {"quse_masks": quse_masks}
             else:
                 yield objective_term

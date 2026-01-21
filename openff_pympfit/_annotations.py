@@ -1,40 +1,38 @@
-from typing import Annotated
 from collections.abc import Callable
-from openff.toolkit import Quantity
-import numpy
 from functools import partial
+from typing import Annotated
+
+import numpy as np
+from openff.toolkit import Quantity
 from pydantic import BeforeValidator
 
 
 def _array_validator(
-    value: numpy.ndarray | Quantity,
+    value: np.ndarray | Quantity,
     unit: str,
-) -> numpy.ndarray:
-    if isinstance(value, numpy.ndarray):
+) -> np.ndarray:
+    if isinstance(value, np.ndarray):
         return value
-    elif isinstance(value, Quantity):
+    if isinstance(value, Quantity):
         return value.m_as(unit)
-    else:
-        raise ValueError(f"Invalid type {type(value)}")
+    raise ValueError(f"Invalid type {type(value)}")
 
 
 def validator_factory(unit: str) -> Callable:
-    """
-    Return a function that converts the input array in given implicit units.
+    """Return a function that converts the input array in given implicit units.
 
-    This is meant to be used as the argument to pydantic.BeforeValidator in an Annotated type.
-
+    This is meant to be used as the argument to pydantic.BeforeValidator
+    in an Annotated type.
     """
     return partial(_array_validator, unit=unit)
 
 
 Coordinates = Annotated[
-    numpy.ndarray[float],
+    np.ndarray[float],
     BeforeValidator(validator_factory(unit="angstrom")),
 ]
 
 MP = Annotated[
-    numpy.ndarray[float],
+    np.ndarray[float],
     BeforeValidator(validator_factory(unit="AU")),
 ]
-

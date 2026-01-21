@@ -1,15 +1,13 @@
-"""Exceptions raised when storing GDMA data"""
+"""Exceptions raised when storing GDMA data."""
 
 from openff.recharge.utilities.exceptions import RechargeException
 
 
 class IncompatibleDBVersion(RechargeException):
-    """An exception raised when attempting to load a GDMA store whose
-    version does not match the version expected by the framework.
-    """
+    """Exception raised when GDMA store version doesn't match expected version."""
 
-    def __init__(self, found_version: int, expected_version: int):
-        """
+    def __init__(self, found_version: int, expected_version: int) -> None:
+        """Initialize the exception.
 
         Parameters
         ----------
@@ -18,7 +16,6 @@ class IncompatibleDBVersion(RechargeException):
         expected_version
             The expected version of the database.
         """
-
         super().__init__(
             f"The database being loaded is currently at version {found_version} "
             f"while the framework expects a version of {expected_version}. There "
