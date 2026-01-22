@@ -10,18 +10,6 @@ Installation
 - Psi4 (for GDMA calculations)
 - openff-recharge
 
-**Install from conda-forge (recommended):**
-
-.. code-block:: bash
-
-    conda install -c conda-forge openff-pympfit
-
-**Note:** GDMA functionality requires Psi4 and PyGDMA:
-
-.. code-block:: bash
-
-    conda install -c conda-forge psi4 pygdma
-
 **Install from source:**
 
 .. code-block:: bash
@@ -29,6 +17,12 @@ Installation
     git clone https://github.com/shehan807/openff-pympfit.git
     cd openff-pympfit
     pip install -e .
+
+**Note:** GDMA functionality requires Psi4 and PyGDMA:
+
+.. code-block:: bash
+
+    pip install psi4 pygdma
 
 Quick Start
 -----------

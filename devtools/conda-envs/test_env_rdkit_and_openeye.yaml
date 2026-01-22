@@ -26,10 +26,6 @@ dependencies:
   - openeye-toolkits
   - rdkit
 
-    # ESP calculations
-  - psi4 =1.9
-  - pygdma
-
     # XTB charges
   - xtb-python
   - geometric =1
