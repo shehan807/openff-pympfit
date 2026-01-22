@@ -1,6 +1,6 @@
 import abc
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from openff.units import Quantity, unit
 from pydantic import BaseModel, Field
@@ -28,8 +28,13 @@ class GDMASettings(BaseModel):
         ),
     )
 
-    multipole_units: str = Field(
-        "AU", description="Whether to print DMA results in atomic units or SI."
+    multipole_units: Literal["AU"] = Field(
+        "AU",
+        description=(
+            "Units for multipole moments. Only 'AU' (atomic units) is supported. "
+            "While GDMA documentation mentions SI units, Psi4's interface only "
+            "accepts AU."
+        ),
     )
 
     radius: list = Field(

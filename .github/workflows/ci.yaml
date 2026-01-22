@@ -37,6 +37,7 @@ jobs:
       - name: Install Package
         shell: bash -l {0}
         run: |
+          python -m pip install psi4 pygdma
           python -m pip install -e .
 
       - name: Conda Environment Information

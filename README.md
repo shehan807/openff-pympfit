@@ -18,24 +18,18 @@ OpenFF-PyMPFIT is a free, open-source software for performing partial atomic cha
 
 ## Installation
 
-**Install from conda-forge (recommended):**
-
-```bash
-conda install -c conda-forge openff-pympfit
-```
-
-**Note:** GDMA functionality requires Psi4 and PyGDMA:
-
-```bash
-conda install -c conda-forge psi4 pygdma
-```
-
 **Install from source:**
 
 ```bash
 git clone https://github.com/shehan807/openff-pympfit.git
 cd openff-pympfit
 pip install -e .
+```
+
+**Note:** GDMA functionality requires Psi4 and PyGDMA:
+
+```bash
+pip install psi4 pygdma
 ```
 
 ## Quick Example
