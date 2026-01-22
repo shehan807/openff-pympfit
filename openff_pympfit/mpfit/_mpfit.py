@@ -159,17 +159,10 @@ def generate_mpfit_charge_parameter(
     # Combine all the terms from different conformers
     combined_term = MPFITObjectiveTerm.combine(*objective_terms)
 
-    # Set up constraints to ensure total charge is preserved
-    constraint_matrix, constraint_vector = mpfit_parameter.generate_constraint_matrix(
-        list(range(len(mpfit_parameter.value)))
-    )
-
     # Solve the fitting problem
     mpfit_charges = solver.solve(
         combined_term.atom_charge_design_matrix,
         combined_term.reference_values,
-        constraint_matrix,
-        constraint_vector,
         ancillary_arrays={
             "quse_masks": quse_masks[0]
         },  # Using first mask set for now (multiple conformers not yet supported)

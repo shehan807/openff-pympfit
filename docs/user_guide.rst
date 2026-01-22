@@ -75,30 +75,19 @@ Use ``MoleculeGDMAStore`` to persist GDMA data to a SQLite database.
 Solver Options
 --------------
 
-MPFIT provides different solvers for the charge fitting problem.
-
-**SVD Solver (default):**
+MPFIT uses SVD (Singular Value Decomposition) to solve the per-site fitting problem.
 
 .. code-block:: python
 
     from openff_pympfit import MPFITSVDSolver
 
+    # Default solver with default threshold
     solver = MPFITSVDSolver()
+
+    # Or customize the SVD threshold for numerical stability
+    solver = MPFITSVDSolver(svd_threshold=1e-4)
+
     library_charge = generate_mpfit_charge_parameter(
         records=records,
         solver=solver,
     )
-
-**Iterative Solver:**
-
-For constrained optimization problems.
-
-.. code-block:: python
-
-    from openff_pympfit.mpfit.solvers import IterativeSolver
-
-    solver = IterativeSolver()
-    library_charge = generate_mpfit_charge_parameter(
-        records=records,
-        solver=solver,
-    ) 
