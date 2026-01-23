@@ -35,6 +35,7 @@ conda install -c conda-forge psi4 pygdma
 ```bash
 git clone https://github.com/shehan807/openff-pympfit.git
 cd openff-pympfit
+conda install -c conda-forge openff-recharge # no pip package for openff-recharge
 pip install -e .
 ```
 
