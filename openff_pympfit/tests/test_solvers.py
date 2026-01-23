@@ -1,108 +1,101 @@
-"""Tests for MPFITSVDSolver and other solvers.
+import numpy as np
+import pytest
 
-Ref: fork/_tests/charges/resp/test_solvers.py
-Pattern: Test loss function, jacobian verification, solver convergence
-
-Priority 5: MPFITSVDSolver (2 tests)
-Priority 6: Solver math verification (3 tests)
-
-TODO: Implement these tests when solver classes are ready.
-"""
-
-# import pytest
+from openff_pympfit.mpfit.solvers import MPFITSolverError, MPFITSVDSolver
 
 
-# class TestMPFITSVDSolver:
-#    """Priority 5: Test MPFITSVDSolver produces valid charges.
-#
-#    Ref: fork/_tests/charges/resp/test_solvers.py::TestIterativeSolver
-#    """
-#
-#    def test_solver_returns_charges(self):
-#        """Test that solver returns a numpy array of charges."""
-#        pytest.skip("TODO: Implement")
-#
-#    def test_charges_sum_to_total(self):
-#        """Test that fitted charges sum to expected total charge.
-#
-#        # Ref: fork/_tests/charges/resp/test_resp.py - charges conservation
-#        # charges = solver.solve(...)
-#        # assert np.isclose(charges.sum(), expected_total_charge)
-#        """
-#        pytest.skip("TODO: Implement")
-#
-#
-#class TestSolverMath:
-#    """Priority 6: Test solver mathematical correctness.
-#
-#    Ref: fork/_tests/charges/resp/test_solvers.py::TestRESPNonLinearSolver
-#    Pattern: Verify loss, jacobian, and initial_guess calculations
-#    """
-#
-#    def test_loss_function(self):
-#        """Test loss function computation with known values."""
-#        pytest.skip("TODO: Implement")
-#
-#    def test_jacobian_vs_finite_difference(self):
-#        """Test analytical jacobian matches numerical gradient.
-#
-#        # Ref: fork/_tests/charges/resp/test_solvers.py::test_jacobian
-#        # h = 0.0001
-#        # analytical = MPFITSolver.jacobian(charges, A, b, C)
-#        # numerical = [(loss(q+h) - loss(q-h)) / (2*h) for each q_i]
-#        # assert np.allclose(analytical, numerical, atol=1e-6)
-#        """
-#        pytest.skip("TODO: Implement")
-#
-#    def test_initial_guess(self):
-#        """Test initial guess computation.
-#
-#        # Ref: fork/_tests/charges/resp/test_solvers.py::test_initial_guess
-#        # initial = MPFITSolver.initial_guess(A, b, C, c_val)
-#        # assert initial.shape == (n_charges, 1)
-#        # Verify: C @ initial ≈ c_val (constraints satisfied)
-#        """
-#        pytest.skip("TODO: Implement")
-#
-#
-#class TestIterativeSolver:
-#    """Test IterativeSolver convergence.
-#
-#    Ref: fork/_tests/charges/resp/test_solvers.py::TestIterativeSolver
-#    """
-#
-#    def test_solve_converges(self):
-#        """Test that iterative solver converges to correct solution.
-#
-#        # Ref: fork/_tests/charges/resp/test_solvers.py::test_solve
-#        # solver = IterativeSolver()
-#        # charges = solver.solve(A, b, C, c_val)
-#        # assert np.allclose(charges, expected_charges, atol=0.001)
-#        """
-#        pytest.skip("TODO: Implement")
-#
-#
-#class TestSciPySolver:
-#    """Test SciPySolver methods.
-#
-#    Ref: fork/_tests/charges/resp/test_solvers.py::TestSciPySolver
-#    """
-#
-#    def test_solve_slsqp(self):
-#        """Test SciPy SLSQP solver.
-#
-#        # solver = SciPySolver(method="SLSQP")
-#        # charges = solver.solve(A, b, C, c_val)
-#        # assert np.allclose(charges, expected_charges, atol=0.001)
-#        """
-#        pytest.skip("TODO: Implement")
-#
-#    def test_solve_error_handling(self):
-#        """Test error handling for unsolvable systems.
-#
-#        # Ref: fork/_tests/charges/resp/test_solvers.py::test_solve_error
-#        # solver = SciPySolver()
-#        # with pytest.raises(MPFITSolverError):
-#        #     solver.solve(bad_A, bad_b, conflicting_C, c_val)
-#        """
-#        pytest.skip("TODO: Implement")
+class TestMPFITSVDSolver:
+    """Test MPFITSVDSolver produces valid charges."""
+
+    def test_solve(self):
+        site_A = np.array([[1.0 / 3.0, 2.0 / 3.0], [3.0 / 3.0, 5.0 / 3.0]])
+        site_b = np.array([-1.0, -2.0])
+
+        design_matrix = np.empty(2, dtype=object)
+        design_matrix[0] = site_A
+        design_matrix[1] = site_A
+
+        reference_values = np.empty(2, dtype=object)
+        reference_values[0] = site_b
+        reference_values[1] = site_b
+
+        quse_masks = np.empty(2, dtype=object)
+        quse_masks[0] = np.array([True, True])
+        quse_masks[1] = np.array([True, True])
+
+        charges = MPFITSVDSolver().solve(
+            design_matrix,
+            reference_values,
+            ancillary_arrays={"quse_masks": quse_masks},
+        )
+
+        assert charges.shape == (2, 1)
+        assert np.allclose(charges, np.array([[6.0], [-6.0]]), atol=0.001)
+
+    def test_solve_with_different_masks(self):
+        """Test that quse_masks correctly control which atoms receive charges."""
+        site_0_A = np.array([[1.0]])
+        site_0_b = np.array([2.0])  
+
+        site_1_A = np.array([[1.0]])
+        site_1_b = np.array([3.0])  
+
+        design_matrix = np.empty(2, dtype=object)
+        design_matrix[0] = site_0_A
+        design_matrix[1] = site_1_A
+
+        reference_values = np.empty(2, dtype=object)
+        reference_values[0] = site_0_b
+        reference_values[1] = site_1_b
+
+        quse_masks = np.empty(2, dtype=object)
+        quse_masks[0] = np.array([True, False])
+        quse_masks[1] = np.array([False, True])
+
+        charges = MPFITSVDSolver().solve(
+            design_matrix,
+            reference_values,
+            ancillary_arrays={"quse_masks": quse_masks},
+        )
+
+        assert charges.shape == (2, 1)
+        assert np.allclose(charges, np.array([[2.0], [3.0]]), atol=0.001)
+
+    def test_solve_error(self):
+        """Test that mismatched dimensions raise an error."""
+        site_A = np.array([[1.0, 2.0], [3.0, 4.0]])
+        site_b = np.array([1.0, 2.0, 3.0])  
+
+        design_matrix = np.empty(1, dtype=object)
+        design_matrix[0] = site_A
+
+        reference_values = np.empty(1, dtype=object)
+        reference_values[0] = site_b
+
+        quse_masks = np.empty(1, dtype=object)
+        quse_masks[0] = np.array([True])
+
+        with pytest.raises(ValueError):
+            MPFITSVDSolver().solve(
+                design_matrix,
+                reference_values,
+                ancillary_arrays={"quse_masks": quse_masks},
+            )
+
+    def test_solve_no_quse(self):
+        """Test that missing quse_masks raises MPFITSolverError."""
+        site_A = np.array([[1.0, 2.0], [3.0, 4.0]])
+        site_b = np.array([1.0, 2.0])
+
+        design_matrix = np.empty(1, dtype=object)
+        design_matrix[0] = site_A
+
+        reference_values = np.empty(1, dtype=object)
+        reference_values[0] = site_b
+
+        with pytest.raises(MPFITSolverError, match="quse_masks"):
+            MPFITSVDSolver().solve(
+                design_matrix,
+                reference_values,
+                ancillary_arrays=None,
+            )
