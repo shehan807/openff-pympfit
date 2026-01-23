@@ -58,7 +58,6 @@ class MPFITSVDSolver(MPFITSolver):
         ----------
         svd_threshold
             The threshold below which singular values are considered zero.
-            This controls numerical stability for ill-conditioned systems.
         """
         self._svd_threshold = svd_threshold
 
@@ -83,26 +82,18 @@ class MPFITSVDSolver(MPFITSolver):
         Returns
         -------
             Charge values that reproduce the multipole moments.
-
-        Raises
-        ------
-        MPFITSolverError
-            If quse_masks is not provided in ancillary_arrays.
         """
-        # Handle empty design matrices
         is_object_array = (
             hasattr(design_matrix, "dtype") and design_matrix.dtype == np.dtype("O")
         )
         if is_object_array and len(design_matrix) == 0:
             return np.zeros((0, 1))
 
-        # Check for required quse_masks
         if ancillary_arrays is None or "quse_masks" not in ancillary_arrays:
             raise MPFITSolverError("SVD solver requires quse_masks in ancillary_arrays")
 
         quse_masks = ancillary_arrays["quse_masks"]
 
-        # Initialize charge values
         n_atoms = len(design_matrix)
         charge_values = np.zeros((n_atoms, 1))
 
@@ -112,21 +103,16 @@ class MPFITSVDSolver(MPFITSolver):
             site_b = reference_values[i]
             quse_mask = np.asarray(quse_masks[i], dtype=bool)
 
-            # Apply SVD to solve the system
-            U, S, Vh = np.linalg.svd(site_A, full_matrices=True)
+            U, S, Vh = np.linalg.svd(site_A, full_matrices=False)
 
-            # Apply threshold to singular values
             S[self._svd_threshold > S] = 0.0
 
-            # Compute pseudo-inverse
             inv_S = np.zeros_like(S)
             mask_S = S != 0
             inv_S[mask_S] = 1.0 / S[mask_S]
 
-            # Solve for charges using SVD
             q = (Vh.T * inv_S) @ (U.T @ site_b)
 
-            # Add the charges to the appropriate atoms using the quse_mask
             charge_values[quse_mask, 0] += q.flatten()
 
         return charge_values

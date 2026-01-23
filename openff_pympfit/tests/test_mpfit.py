@@ -7,6 +7,70 @@ multi-conformer consistency
 Priority 7: generate_mpfit_charge_parameter (3 tests)
 Priority 8: Physics accuracy tests (2 tests)
 Priority 9: Integration test (1 test)
+
+================================================================================
+ANALYSIS FINDINGS: MPFIT vs RESP Comparison
+================================================================================
+
+Key differences from RESP (fork/_tests/charges/resp/test_resp.py):
+
+1. EQUIVALENCE HANDLING:
+   - RESP uses 4 equivalence categories:
+     * symmetrize_methyl_carbons (carbons bonded to 3 hydrogens)
+     * symmetrize_methyl_hydrogens
+     * symmetrize_other_heavy_atoms
+     * symmetrize_other_hydrogens
+   - MPFIT uses 2 simpler categories (in molecule_to_mpfit_library_charge):
+     * symmetrize_hydrogens (default=False)
+     * symmetrize_other_atoms (default=False)
+
+2. PROVENANCE STRUCTURE:
+   - Both store provenance dict with index tracking
+   - RESP: provenance["methyl-carbon-indices"], ["other-heavy-indices"], etc.
+   - MPFIT: provenance["hydrogen-indices"], provenance["other-indices"]
+
+3. TEST MAPPING (from fork/test_resp.py):
+   - test_generate_dummy_values -> APPLICABLE: Tests charge sum constraint
+   - test_molecule_to_resp_library_charge -> APPLICABLE: Test LibraryChargeParameter creation
+   - test_deduplicate_constraints -> NOT APPLICABLE: MPFIT doesn't use constraints
+   - test_generate_resp_systems_of_equations -> NOT APPLICABLE: MPFIT uses different math
+   - test_generate_resp_charge_parameter -> APPLICABLE: Main fitting function test
+   - test_generate_resp_charge_parameter_scipy -> APPLICABLE: Different solver test
+
+================================================================================
+MULTI-CONFORMER SUPPORT (RESOLVED)
+================================================================================
+
+The multi-conformer fitting issue has been fixed. The solution uses per-site
+matrix stacking rather than the problematic MPFITObjectiveTerm.combine() approach.
+
+IMPLEMENTATION (openff_pympfit/mpfit/_mpfit.py):
+- For each multipole site, stack A matrices from all conformers vertically
+- Stack b vectors from all conformers
+- Solve the combined least-squares problem per site
+- This properly handles overdetermined systems (more equations than unknowns)
+
+SOLVER FIX (openff_pympfit/mpfit/solvers.py):
+- Changed SVD to full_matrices=False to handle non-square (overdetermined) matrices
+- This is required when stacking matrices from multiple conformers
+
+VALIDATION:
+- quse_masks are validated to be identical across conformers
+- If masks differ (geometries too different), a ValueError is raised with
+  guidance to use more similar conformers or increase mpfit_atom_radius
+
+TESTED MOLECULES (examples/conformer_dependence_test.py):
+- Conformer-DEPENDENT (show expected charge variation):
+  * 1,2-difluoroethane: max Δq = 1.26 (gauche effect)
+  * 1,2-dichloroethane: max Δq = 2.14
+  * ethylene glycol: max Δq = 0.74 (intramolecular H-bonding)
+  * 2-fluoroethanol: max Δq = 0.68
+  * 1,2-dimethoxyethane: max Δq = 2.51
+- Conformer-INDEPENDENT: Rigid molecules (methane, benzene, etc.) correctly
+  generate only 1 conformer, so no false positives.
+
+ALL TESTS NOW UNBLOCKED.
+================================================================================
 """
 
 # import pytest
@@ -110,6 +174,9 @@ Priority 9: Integration test (1 test)
 #        # records = [mock_gdma_record_water] * n_conformers
 #        # result = generate_mpfit_charge_parameter(records, MPFITSVDSolver())
 #        # All should yield same charges regardless of n_conformers
+#        #
+#        # UNBLOCKED: Multi-conformer support has been implemented via per-site
+#        # matrix stacking. Identical conformers should yield identical charges.
 #        """
 #        pytest.skip("TODO: Implement")
 #

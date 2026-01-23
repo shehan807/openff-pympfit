@@ -1,6 +1,7 @@
 import warnings
 from typing import TYPE_CHECKING
 
+import numpy as np
 from openff.recharge.charges.library import (
     LibraryChargeCollection,
     LibraryChargeParameter,
@@ -14,7 +15,7 @@ from openff.units import unit
 
 from openff_pympfit.gdma.storage import MoleculeGDMARecord
 from openff_pympfit.mpfit.solvers import MPFITSolver
-from openff_pympfit.optimize import MPFITObjective, MPFITObjectiveTerm
+from openff_pympfit.optimize import MPFITObjective
 
 if TYPE_CHECKING:
     from openff.toolkit import Molecule
@@ -154,18 +155,42 @@ def generate_mpfit_charge_parameter(
 
     # Separate objective terms and quse_masks
     objective_terms = [term for term, _ in objective_terms_and_masks]
-    quse_masks = [mask["quse_masks"] for _, mask in objective_terms_and_masks]
+    quse_masks_list = [mask["quse_masks"] for _, mask in objective_terms_and_masks]
 
-    # Combine all the terms from different conformers
-    combined_term = MPFITObjectiveTerm.combine(*objective_terms)
+    # Validate that quse_masks are identical across all conformers
+    # quse_mask depends on interatomic distances, which can vary across conformers
+    # If masks differ, per-site stacking would combine incompatible subproblems
+    if len(quse_masks_list) > 1:
+        reference_masks = quse_masks_list[0]
+        for conf_idx, masks in enumerate(quse_masks_list[1:], start=2):
+            for site_idx, (ref_mask, mask) in enumerate(zip(reference_masks, masks)):
+                if not np.array_equal(ref_mask, mask):
+                    msg = (
+                        f"quse_mask mismatch at site {site_idx} between conformer 1 "
+                        f"and conformer {conf_idx}. This can occur when conformers have "
+                        f"significantly different geometries. Consider using conformers "
+                        f"with more similar structures or increasing mpfit_atom_radius."
+                    )
+                    raise ValueError(msg)
+
+    # Combine at per-site level: stack each site's matrices across conformers
+    # This properly handles multi-conformer fitting by solving a single
+    # least-squares problem per site with data from all conformers
+    n_sites = len(objective_terms[0].atom_charge_design_matrix)
+    combined_design_matrices = []
+    combined_reference_values = []
+
+    for site_idx in range(n_sites):
+        site_As = [term.atom_charge_design_matrix[site_idx] for term in objective_terms]
+        site_bs = [term.reference_values[site_idx] for term in objective_terms]
+        combined_design_matrices.append(np.vstack(site_As))
+        combined_reference_values.append(np.concatenate(site_bs))
 
     # Solve the fitting problem
     mpfit_charges = solver.solve(
-        combined_term.atom_charge_design_matrix,
-        combined_term.reference_values,
-        ancillary_arrays={
-            "quse_masks": quse_masks[0]
-        },  # Using first mask set for now (multiple conformers not yet supported)
+        np.array(combined_design_matrices, dtype=object),
+        np.array(combined_reference_values, dtype=object),
+        ancillary_arrays={"quse_masks": quse_masks_list[0]},
     )
 
     mpfit_parameter.value = mpfit_charges.flatten().tolist()
