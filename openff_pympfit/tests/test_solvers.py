@@ -8,16 +8,18 @@ class TestMPFITSVDSolver:
     """Test MPFITSVDSolver produces valid charges."""
 
     def test_solve(self):
-        site_A = np.array([[1.0 / 3.0, 2.0 / 3.0], [3.0 / 3.0, 5.0 / 3.0]])
-        site_b = np.array([-1.0, -2.0])
+        A_site = np.array(  # noqa: N806
+            [[1.0 / 3.0, 2.0 / 3.0], [3.0 / 3.0, 5.0 / 3.0]]
+        )
+        b_site = np.array([-1.0, -2.0])
 
         design_matrix = np.empty(2, dtype=object)
-        design_matrix[0] = site_A
-        design_matrix[1] = site_A
+        design_matrix[0] = A_site
+        design_matrix[1] = A_site
 
         reference_values = np.empty(2, dtype=object)
-        reference_values[0] = site_b
-        reference_values[1] = site_b
+        reference_values[0] = b_site
+        reference_values[1] = b_site
 
         quse_masks = np.empty(2, dtype=object)
         quse_masks[0] = np.array([True, True])
@@ -34,19 +36,19 @@ class TestMPFITSVDSolver:
 
     def test_solve_with_different_masks(self):
         """Test that quse_masks correctly control which atoms receive charges."""
-        site_0_A = np.array([[1.0]])
-        site_0_b = np.array([2.0])  
+        A_site_0 = np.array([[1.0]])  # noqa: N806
+        b_site_0 = np.array([2.0])
 
-        site_1_A = np.array([[1.0]])
-        site_1_b = np.array([3.0])  
+        A_site_1 = np.array([[1.0]])  # noqa: N806
+        b_site_1 = np.array([3.0])
 
         design_matrix = np.empty(2, dtype=object)
-        design_matrix[0] = site_0_A
-        design_matrix[1] = site_1_A
+        design_matrix[0] = A_site_0
+        design_matrix[1] = A_site_1
 
         reference_values = np.empty(2, dtype=object)
-        reference_values[0] = site_0_b
-        reference_values[1] = site_1_b
+        reference_values[0] = b_site_0
+        reference_values[1] = b_site_1
 
         quse_masks = np.empty(2, dtype=object)
         quse_masks[0] = np.array([True, False])
@@ -63,19 +65,19 @@ class TestMPFITSVDSolver:
 
     def test_solve_error(self):
         """Test that mismatched dimensions raise an error."""
-        site_A = np.array([[1.0, 2.0], [3.0, 4.0]])
-        site_b = np.array([1.0, 2.0, 3.0])  
+        A_site = np.array([[1.0, 2.0], [3.0, 4.0]])  # noqa: N806
+        b_site = np.array([1.0, 2.0, 3.0])
 
         design_matrix = np.empty(1, dtype=object)
-        design_matrix[0] = site_A
+        design_matrix[0] = A_site
 
         reference_values = np.empty(1, dtype=object)
-        reference_values[0] = site_b
+        reference_values[0] = b_site
 
         quse_masks = np.empty(1, dtype=object)
         quse_masks[0] = np.array([True])
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="matmul"):
             MPFITSVDSolver().solve(
                 design_matrix,
                 reference_values,
@@ -84,14 +86,14 @@ class TestMPFITSVDSolver:
 
     def test_solve_no_quse(self):
         """Test that missing quse_masks raises MPFITSolverError."""
-        site_A = np.array([[1.0, 2.0], [3.0, 4.0]])
-        site_b = np.array([1.0, 2.0])
+        A_site = np.array([[1.0, 2.0], [3.0, 4.0]])  # noqa: N806
+        b_site = np.array([1.0, 2.0])
 
         design_matrix = np.empty(1, dtype=object)
-        design_matrix[0] = site_A
+        design_matrix[0] = A_site
 
         reference_values = np.empty(1, dtype=object)
-        reference_values[0] = site_b
+        reference_values[0] = b_site
 
         with pytest.raises(MPFITSolverError, match="quse_masks"):
             MPFITSVDSolver().solve(
