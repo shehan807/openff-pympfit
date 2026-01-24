@@ -14,12 +14,6 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from openff_pympfit._annotations import MP, Coordinates
 from openff_pympfit.gdma import GDMASettings
-
-# Define "AU" (atomic units) as a custom unit for multipole moments.
-# Multipoles from GDMA are always in atomic units (e*a0^n for rank n).
-# Since different ranks have different dimensions, we treat AU as dimensionless
-# but labeled for clarity.
-unit.define("AU = [] = au = atomic_unit")
 from openff_pympfit.gdma.storage.db import (
     DB_VERSION,
     DBBase,
@@ -31,6 +25,8 @@ from openff_pympfit.gdma.storage.db import (
     DBSoftwareProvenance,
 )
 from openff_pympfit.gdma.storage.exceptions import IncompatibleDBVersion
+
+unit.define("AU = [] = au = atomic_unit")
 
 
 class MoleculeGDMARecord(BaseModel):
