@@ -83,9 +83,9 @@ class MPFITSVDSolver(MPFITSolver):
         -------
             Charge values that reproduce the multipole moments.
         """
-        is_object_array = (
-            hasattr(design_matrix, "dtype") and design_matrix.dtype == np.dtype("O")
-        )
+        is_object_array = hasattr(
+            design_matrix, "dtype"
+        ) and design_matrix.dtype == np.dtype("O")
         if is_object_array and len(design_matrix) == 0:
             return np.zeros((0, 1))
 
@@ -99,11 +99,11 @@ class MPFITSVDSolver(MPFITSolver):
 
         # Solve for each multipole site
         for i in range(len(design_matrix)):
-            site_A = design_matrix[i]
-            site_b = reference_values[i]
+            site_A = np.asarray(design_matrix[i], dtype=np.float64)
+            site_b = np.asarray(reference_values[i], dtype=np.float64)
             quse_mask = np.asarray(quse_masks[i], dtype=bool)
 
-            U, S, Vh = np.linalg.svd(site_A, full_matrices=False)
+            U, S, Vh = np.linalg.svd(site_A)
 
             S[self._svd_threshold > S] = 0.0
 
