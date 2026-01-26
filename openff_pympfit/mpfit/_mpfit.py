@@ -93,9 +93,6 @@ def _fit_single_conformer(
         MPFITObjective.compute_objective_terms(
             [gdma_record],
             charge_collection=LibraryChargeCollection(parameters=[mpfit_parameter]),
-            charge_parameter_keys=[
-                (mpfit_parameter.smiles, tuple(range(len(mpfit_parameter.value))))
-            ],
             return_quse_masks=True,
         )
     )

@@ -42,7 +42,6 @@ class MPFITObjective(Objective):
         cls,
         gdma_records: list[MoleculeGDMARecord],
         charge_collection: LibraryChargeCollection | None = None,
-        charge_parameter_keys: list[tuple[str, tuple[int, ...]]] | None = None,
         vsite_collection: VirtualSiteCollection | None = None,
         _vsite_charge_parameter_keys: list[VirtualSiteChargeKey] | None = None,
         _vsite_coordinate_parameter_keys: list[VirtualSiteGeometryKey] | None = None,
