@@ -1,13 +1,19 @@
+# Read the Docs configuration file for Sphinx projects
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
 version: 2
 
 build:
-  os: "ubuntu-22.04"
+  os: ubuntu-22.04
   tools:
     python: "mambaforge-22.9"
-
-conda:
-  environment: docs/requirements.yaml
+  jobs:
+    post_create_environment:
+      - mamba env update --file docs/requirements.yaml
 
 sphinx:
-  # Path to your Sphinx configuration file.
   configuration: docs/conf.py
+
+formats:
+  - pdf
+  - epub

@@ -1,6 +1,6 @@
 <div align="center">
 
-![OpenFF PyMPFIT](docs/_static/pympfit_logo.png)
+<img src="docs/_static/pympfit_logo.png" alt="OpenFF PyMPFIT" width="400">
 
 [![GitHub Actions Build Status](https://github.com/shehan807/openff-pympfit/actions/workflows/ci.yaml/badge.svg)](https://github.com/shehan807/openff-pympfit/actions/workflows/ci.yaml)
 [![codecov](https://codecov.io/gh/shehan807/openff-pympfit/branch/main/graph/badge.svg)](https://codecov.io/gh/shehan807/openff-pympfit)
