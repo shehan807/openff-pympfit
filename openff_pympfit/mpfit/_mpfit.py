@@ -67,7 +67,6 @@ def molecule_to_mpfit_library_charge(molecule: "Molecule") -> LibraryChargeParam
 
 def _fit_single_conformer(
     gdma_record: MoleculeGDMARecord,
-    mpfit_parameter: LibraryChargeParameter,
     solver: "MPFITSolver",
 ) -> np.ndarray:
     """Fit charges for a single conformer.
@@ -76,8 +75,6 @@ def _fit_single_conformer(
     ----------
     gdma_record
         The GDMA record for this conformer.
-    mpfit_parameter
-        The library charge parameter defining the molecule.
     solver
         The solver to use for fitting.
 
@@ -155,7 +152,7 @@ def generate_mpfit_charge_parameter(
     # Fit each conformer independently and average the results
     all_charges = []
     for record in gdma_records:
-        charges = _fit_single_conformer(record, mpfit_parameter, solver)
+        charges = _fit_single_conformer(record, solver)
         all_charges.append(charges)
 
     # Average charges across conformers
