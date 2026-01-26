@@ -226,8 +226,7 @@ class TestPsi4GDMAGenerator:
         from openff_pympfit.gdma.psi4 import Psi4GDMAGenerator
 
         # Define the settings to use
-        # Use switch=0.0 to force standard DMA for consistent behavior across platforms
-        settings = GDMASettings(switch=0.0)
+        settings = GDMASettings()
 
         molecule = smiles_to_molecule("C")
         input_conformer = (
