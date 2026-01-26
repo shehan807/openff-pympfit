@@ -2,10 +2,7 @@ import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
-from openff.recharge.charges.library import (
-    LibraryChargeCollection,
-    LibraryChargeParameter,
-)
+from openff.recharge.charges.library import LibraryChargeParameter
 from openff.recharge.utilities.toolkits import molecule_to_tagged_smiles
 from openff.toolkit.utils.exceptions import AtomMappingWarning
 from openff.units import unit
@@ -92,7 +89,6 @@ def _fit_single_conformer(
     objective_terms_and_masks = list(
         MPFITObjective.compute_objective_terms(
             [gdma_record],
-            charge_collection=LibraryChargeCollection(parameters=[mpfit_parameter]),
             return_quse_masks=True,
         )
     )
