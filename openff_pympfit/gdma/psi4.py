@@ -120,7 +120,7 @@ class Psi4GDMAGenerator(GDMAGenerator):
         memory: Quantity = 500 * unit.mebibytes,
     ) -> tuple[Quantity, Quantity | None, Quantity | None]:
         # Perform the calculation in a temporary directory
-        with temporary_cd("./"):  # directory):
+        with temporary_cd():
             # Store the input file.
             input_contents = cls._generate_input(
                 molecule,
