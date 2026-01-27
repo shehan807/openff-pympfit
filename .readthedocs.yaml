@@ -6,7 +6,7 @@ version: 2
 build:
   os: ubuntu-22.04
   tools:
-    python: "mambaforge-23.1"
+    python: "mambaforge-23.11"
   jobs:
     post_create_environment:
       - mamba env update --name latest --file docs/requirements.yaml
