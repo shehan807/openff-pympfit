@@ -1,75 +1,60 @@
-.. openff_pympfit documentation master file, created by
-   sphinx-quickstart on Thu Mar 15 13:55:56 2018.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. toctree::
+   :caption: Getting Started
+   :hidden:
 
-Welcome to OpenFF PyMPFIT's documentation!
-=========================================================
-
-.. grid:: 1 1 2 2
-
-    .. grid-item-card:: Getting Started
-      :margin: 0 3 0 0
-      
-      Learn the basics of using OpenFF PyMPFIT.
-
-      .. button-link:: ./getting_started.html
-         :color: primary
-         :outline:
-         :expand:
-
-         To the Getting Started Guide
-
-      
-
-    .. grid-item-card::  User Guide
-      :margin: 0 3 0 0
-      
-      An in-depth guide for users.
-
-      .. button-link:: ./user_guide.html
-         :color: primary
-         :outline:
-         :expand:
-
-         To the User Guide
-      
-      
-
-    .. grid-item-card:: API Reference
-      :margin: 0 3 0 0
-      
-      How to use the API of OpenFF PyMPFIT.
-
-      .. button-link:: ./api.html
-         :color: primary
-         :outline:
-         :expand:
-
-         To the API Reference.
-
-      
-
-    .. grid-item-card::  Developer Guide
-      :margin: 0 3 0 0
-      
-      How to contribute to OpenFF PyMPFIT.
-
-      .. button-link:: ./developer_guide.html
-         :color: primary
-         :outline:
-         :expand:
-
-         To the Developer Guide
-
+   Introduction <self>
+   installation
+   tutorials/index
 
 .. toctree::
-   :maxdepth: 2
+   :caption: User Guide
    :hidden:
-   :titlesonly:
 
-   getting_started
-   user_guide
-   api
-   developer_guide
+   user_guide/theory
 
+.. toctree::
+   :caption: Reference
+   :hidden:
+
+   API <api>
+
+.. Comment out developer guide for now
+.. .. toctree::
+..    :caption: Development
+..    :hidden:
+..
+..    developer_guide
+
+============
+Introduction
+============
+
+**OpenFF PyMPFIT** is a Python implementation of the Multipole Fitting (MPFIT)
+algorithm for deriving partial atomic charges from Gaussian distributed multipole
+moments. **OpenFF PyMPFIT**, originally a fork of
+`openff-recharge <https://github.com/openforcefield/openff-recharge>`_, is built
+upon open-source libraries, including
+`OpenFF Recharge <https://github.com/openforcefield/openff-recharge>`_ and
+`OpenFF Toolkit <https://github.com/openforcefield/openff-toolkit>`_.
+
+Features
+--------
+
+The framework currently supports:
+
+* **Generating multi-conformer QC DMA and multipole moment data**
+
+  - Directly by interfacing with the `Psi4 <https://psicode.org/>`_ /
+    `GDMA <https://github.com/psi4/gdma>`_ quantum chemical code
+  - From wavefunctions stored within a
+    `QCFractal <https://github.com/MolSSI/QCFractal>`_ instance, including the
+    `QCArchive <https://qcarchive.molssi.org/>`_
+
+* **Flexible, Bayesian virtual site fitting** powered by
+  `Pyro <https://pyro.ai/>`_ with planned support for
+  `NumPyro <https://num.pyro.ai/>`_
+
+* A SMARTS port for direct partial charge output
+
+* An `SQLite <https://www.sqlite.org/>`_ database backend for efficient
+  high-throughput scaling

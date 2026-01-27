@@ -1,9 +1,9 @@
 API Documentation
 =================
 
-.. autosummary::
-   :toctree: autosummary
+.. toctree::
+   :maxdepth: 4
 
-   openff_pympfit.mpfit
-   openff_pympfit.gdma
-   openff_pympfit.optimize
+   api/mpfit
+   api/gdma
+   api/optimize
