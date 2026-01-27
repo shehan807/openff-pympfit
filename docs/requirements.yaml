@@ -3,7 +3,7 @@ channels:
   - conda-forge
 dependencies:
   # Base depends
-  - python
+  - python >=3.10,<3.13
   - pip
 
   # Core package dependencies
@@ -19,12 +19,10 @@ dependencies:
 
   # Documentation dependencies
   - sphinx
-  - pydata-sphinx-theme
-  - furo  
+  - furo
   - sphinx-design
   - sphinx-copybutton
-  - sphinx-autobuild  
-  - myst-parser  
+  - myst-parser
 
   # Install package from repo root
   - pip:
