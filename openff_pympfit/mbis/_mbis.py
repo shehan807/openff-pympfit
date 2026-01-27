@@ -27,6 +27,33 @@ class MBISSettings(BaseModel):
             "MBIS data file should be provided."
         ),
     )
+    e_convergence: int = Field(
+        8, description="Energy convergence criterion for the MBIS calculation."
+    )
+    d_convergence: int = Field(
+        8, description="Density convergence criterion for the MBIS calculation."
+    )
+    dft_radial_points: int = Field(
+        99, description="Number of radial points for DFT integration."
+    )
+    dft_spherical_points: int = Field(
+        590, description="Number of spherical points for DFT integration."
+    )
+    max_radial_moment: int = Field(
+        4, description="Maximum radial moment to compute for each atom. n=1 to 4 supported with 1=charges, 2=dipoles, 3=quadrupoles, 4=octupoles."
+    )
+    mbis_d_convergence: int = Field(
+        9, description="Density convergence criterion specifically for MBIS."
+    )
+    mbis_radial_points: int = Field(
+        99, description="Number of radial points for MBIS integration."
+    )
+    mbis_spherical_points: int = Field(
+        590, description="Number of spherical points for MBIS integration."
+    )
+    guess: str = Field(
+        "sad", description="The initial guess method for the SCF."
+    )
 
     multipole_units: str = Field(
         "AU", description="Whether to print MBIS results in atomic units or SI."

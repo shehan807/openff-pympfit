@@ -76,7 +76,7 @@ class Psi4MBISGenerator(MBISGenerator):
 
         # Format the jinja template
         template_path = get_data_file_path(
-            os.path.join("psi4", "input.dat"), "openff_pympfit"
+            os.path.join("psi4", "mbis.dat"), "openff_pympfit"
         )
 
         with open(template_path) as file:
@@ -95,12 +95,20 @@ class Psi4MBISGenerator(MBISGenerator):
             "method": settings.method,
             "limit": settings.limit,
             "multipole_units": settings.multipole_units,
-            "radius": settings.radius,
-            "switch": settings.switch,
             "minimize": minimize,
             "compute_mp": compute_mp,
             "properties": str(properties),
             "memory": f"{memory:~P}",
+            "e_convergence": settings.e_convergence,
+            "d_convergence": settings.d_convergence,
+            "guess": settings.guess,
+            "dft_radial_points": settings.dft_radial_points,
+            "dft_spherical_points": settings.dft_spherical_points,
+            "mbis_d_convergence": settings.mbis_d_convergence,
+            "mbis_radial_points": settings.mbis_radial_points,
+            "mbis_spherical_points": settings.mbis_spherical_points,
+            "max_radial_moment": settings.max_radial_moment,
+
         }
 
         # Remove the white space after the for loop

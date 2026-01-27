@@ -12,15 +12,15 @@ molecule mol {
 set {
   basis {{ basis }}
 {%- if compute_mp %}
-  # GDMA options
-  gdma_limit    {{ limit }}
-  gdma_multipole_units {{ multipole_units }}
-  gdma_radius   {{ radius }}
-  gdma_switch   {{ switch }}
-  
-  {% if gdma_origin -%}
-  gdma_origin   {{ gdma_origin }}
-  {% endif -%}
+d_convergence {{ d_convergence }}
+e_convergence {{ e_convergence }}
+dft_radial_points {{ dft_radial_points }}
+dft_spherical_points {{ dft_spherical_points }}
+guess {{ guess }}
+mbis_d_convergence {{ mbis_d_convergence }}
+mbis_radial_points {{ mbis_radial_points }}
+mbis_spherical_points {{ mbis_spherical_points }}
+max_radial_moment {{ max_radial_moment }}
 {%- endif %}
 }
 
@@ -35,24 +35,30 @@ energy, wfn = energy('{{ method }}', return_wfn=True)
 # Run OEPROP
 oeprop(
     wfn,
+    'mbis_charges',
 )
+print('OEPROP')
 {%- endif %}
 
 # Save final geometry
 mol.save_xyz_file('final-geometry.xyz', 1)
 
-{%- if compute_mp %}
-# Get GDMA results
-dma_distributed = variable("DMA DISTRIBUTED MULTIPOLES")
-dma_total = variable("DMA TOTAL MULTIPOLES")
-
 import numpy as np
 
-# Convert Matrix objects to NumPy arrays
-dma_distributed_array = dma_distributed.to_array()
-dma_total_array = dma_total.to_array()
-
-# Save arrays to disk
-np.save('dma_distributed.npy', dma_distributed_array)
-np.save('dma_total.npy', dma_total_array)
+{%- if compute_mp %}
+mbis_charges = wfn.variable('MBIS CHARGES')
+np.save('mbis_charges.npy', mbis_charges)
+# Need to ensure max_radial_mooment is > 1
+{%- if max_radial_moment | int > 1 %}
+mbis_dipoles = wfn.variable('MBIS DIPOLES')
+np.save('mbis_dipoles.npy', mbis_dipoles)
+{%- endif %}
+{%- if max_radial_moment | int > 2 %}
+mbis_quadrupoles = wfn.variable('MBIS QUADRUPOLES')
+np.save('mbis_quadrupoles.npy', mbis_quadrupoles)
+{%- endif %}
+{%- if max_radial_moment | int > 3 %}
+mbis_octupoles = wfn.variable('MBIS OCTUPOLES')
+np.save('mbis_octupoles.npy', mbis_octupoles)
+{%- endif %}
 {%- endif %}

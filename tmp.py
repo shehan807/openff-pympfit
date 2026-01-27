@@ -6,6 +6,9 @@ from openff_pympfit import (
     Psi4GDMAGenerator,
     MoleculeGDMARecord,
     MPFITSVDSolver,
+    MBISSettings,
+    Psi4MBISGenerator,
+    # MoleculeMBISRecord,
 )
 
 # Create molecule and generate conformer
@@ -16,6 +19,15 @@ molecule.generate_conformers(n_conformers=1)
 # Generate GDMA multipoles (requires Psi4)
 settings = GDMASettings()
 coords, multipoles = Psi4GDMAGenerator.generate(molecule, conformer, settings)
+record = MoleculeGDMARecord.from_molecule(molecule, coords, multipoles, settings)
+
+# Fit charges
+charges = generate_mpfit_charge_parameter([record], MPFITSVDSolver())
+print(f"Charges: {charges.value}")
+
+# Generate MBIS multipoles (requires Psi4)
+settings = MBISSettings()
+coords, multipoles = Psi4MBISGenerator.generate(molecule, conformer, settings, compute_mp=True)
 record = MoleculeGDMARecord.from_molecule(molecule, coords, multipoles, settings)
 
 # Fit charges
