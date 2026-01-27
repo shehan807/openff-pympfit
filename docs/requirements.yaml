@@ -20,8 +20,11 @@ dependencies:
   # Documentation dependencies
   - sphinx
   - pydata-sphinx-theme
+  - furo  
   - sphinx-design
   - sphinx-copybutton
+  - sphinx-autobuild  
+  - myst-parser  
 
   # Install package from repo root
   - pip:
