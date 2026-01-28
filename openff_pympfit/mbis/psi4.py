@@ -163,32 +163,50 @@ class Psi4MBISGenerator(MBISGenerator):
                 n_atoms = len(mbis_charges)
                 max_moment = settings.max_radial_moment
 
-                # Calculate total components: 1 + 3 + 5 + 7 = 16 for max_moment=4
-                # or (max_moment + 1)^2 = 25 for spherical harmonics convention
+                # Calculate total components: (max_moment + 1)^2 for spherical harmonics
+                # l=0: 1, l=1: 3, l=2: 5, l=3: 7, l=4: 9 -> total = 25 for max_moment=4
                 n_components = (max_moment + 1) ** 2
                 mp = np.zeros((n_atoms, n_components))
 
-                # Monopole (charge) - 1 component
-                mp[:, 0] = mbis_charges
+                # Monopole (charge) - 1 component (l=0)
+                mp[:, 0] = mbis_charges.flatten()
 
-                # Dipoles - 3 components (if available)
-                if max_moment > 1 and os.path.exists("mbis_dipoles.npy"):
+                # Dipoles - 3 components (l=1, indices 1-3)
+                if max_moment >= 1 and os.path.exists("mbis_dipoles.npy"):
                     mbis_dipoles = np.load("mbis_dipoles.npy")
+                    # Dipoles are (n_atoms, 3) - x, y, z components
                     mp[:, 1:4] = mbis_dipoles
 
-                # Quadrupoles - 5 components (if available)
-                if max_moment > 2 and os.path.exists("mbis_quadrupoles.npy"):
+                # Quadrupoles - 5 components (l=2, indices 4-8)
+                if max_moment >= 2 and os.path.exists("mbis_quadrupoles.npy"):
                     mbis_quadrupoles = np.load("mbis_quadrupoles.npy")
-                    # Quadrupoles have 6 unique components in Cartesian,
-                    # but we store 5 in spherical harmonics
-                    mp[:, 4:9] = mbis_quadrupoles[:, :5]
+                    # Quadrupoles are (n_atoms, 3, 3) symmetric tensors
+                    # Extract unique components: xx, xy, xz, yy, yz (traceless form)
+                    # The zz component is determined by tracelessness: zz = -(xx + yy)
+                    for i in range(n_atoms):
+                        q = mbis_quadrupoles[i]
+                        # Store in order: xx, xy, xz, yy, yz
+                        mp[i, 4] = q[0, 0]  # xx
+                        mp[i, 5] = q[0, 1]  # xy
+                        mp[i, 6] = q[0, 2]  # xz
+                        mp[i, 7] = q[1, 1]  # yy
+                        mp[i, 8] = q[1, 2]  # yz
 
-                # Octupoles - 7 components (if available)
-                if max_moment > 3 and os.path.exists("mbis_octupoles.npy"):
+                # Octupoles - 7 components (l=3, indices 9-15)
+                if max_moment >= 3 and os.path.exists("mbis_octupoles.npy"):
                     mbis_octupoles = np.load("mbis_octupoles.npy")
-                    # Octupoles have 10 unique components in Cartesian,
-                    # but we store 7 in spherical harmonics
-                    mp[:, 9:16] = mbis_octupoles[:, :7]
+                    # Octupoles are (n_atoms, 3, 3, 3) symmetric tensors
+                    # Extract 7 unique components for traceless form
+                    for i in range(n_atoms):
+                        o = mbis_octupoles[i]
+                        # Store in order: xxx, xxy, xxz, xyy, xyz, xzz, yyy
+                        mp[i, 9] = o[0, 0, 0]  # xxx
+                        mp[i, 10] = o[0, 0, 1]  # xxy
+                        mp[i, 11] = o[0, 0, 2]  # xxz
+                        mp[i, 12] = o[0, 1, 1]  # xyy
+                        mp[i, 13] = o[0, 1, 2]  # xyz
+                        mp[i, 14] = o[0, 2, 2]  # xzz
+                        mp[i, 15] = o[1, 1, 1]  # yyy
 
             with open("final-geometry.xyz") as file:
                 output_lines = file.read().splitlines(keepends=False)

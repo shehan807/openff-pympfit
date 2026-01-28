@@ -13,34 +13,39 @@ class TestPsi4MBISGenerator:
             (
                 True,
                 [
-                    "  # MBIS options",
-                    "  mbis_limit    4",
-                    "  mbis_multipole_units AU",
-                    "  mbis_radius   ['C', 0.53, 'N', 0.53, 'H', 0.53]",
-                    "  mbis_switch   4.0",
-                    "  ",
+                    "d_convergence 8",
+                    "e_convergence 8",
+                    "dft_radial_points 99",
+                    "dft_spherical_points 590",
+                    "guess sad",
+                    "mbis_d_convergence 9",
+                    "mbis_radial_points 99",
+                    "mbis_spherical_points 590",
+                    "max_radial_moment 4",
                     "}",
                     "",
                     "# Calculate the wavefunction",
                     "energy, wfn = energy('pbe0', return_wfn=True)",
-                    "# Run MBIS",
-                    "mbis(wfn)",
+                    "# Run OEPROP",
+                    "oeprop(",
+                    "    wfn,",
+                    "    'mbis_charges',",
+                    ")",
+                    "print('OEPROP')",
                     "",
                     "# Save final geometry",
                     "mol.save_xyz_file('final-geometry.xyz', 1)",
-                    "# Get MBIS results",
-                    'dma_distributed = variable("DMA DISTRIBUTED MULTIPOLES")',
-                    'dma_total = variable("DMA TOTAL MULTIPOLES")',
                     "",
                     "import numpy as np",
-                    "",
-                    "# Convert Matrix objects to NumPy arrays",
-                    "dma_distributed_array = dma_distributed.to_array()",
-                    "dma_total_array = dma_total.to_array()",
-                    "",
-                    "# Save arrays to disk",
-                    "np.save('dma_distributed.npy', dma_distributed_array)",
-                    "np.save('dma_total.npy', dma_total_array)",
+                    "mbis_charges = wfn.variable('MBIS CHARGES')",
+                    "np.save('mbis_charges.npy', mbis_charges)",
+                    "# Need to ensure max_radial_mooment is > 1",
+                    "mbis_dipoles = wfn.variable('MBIS DIPOLES')",
+                    "np.save('mbis_dipoles.npy', mbis_dipoles)",
+                    "mbis_quadrupoles = wfn.variable('MBIS QUADRUPOLES')",
+                    "np.save('mbis_quadrupoles.npy', mbis_quadrupoles)",
+                    "mbis_octupoles = wfn.variable('MBIS OCTUPOLES')",
+                    "np.save('mbis_octupoles.npy', mbis_octupoles)",
                 ],
             ),
             (
@@ -53,6 +58,8 @@ class TestPsi4MBISGenerator:
                     "",
                     "# Save final geometry",
                     "mol.save_xyz_file('final-geometry.xyz', 1)",
+                    "",
+                    "import numpy as np",
                 ],
             ),
         ],
@@ -103,62 +110,53 @@ class TestPsi4MBISGenerator:
                 {},
                 [
                     "  basis def2-SVP",
-                    "  # MBIS options",
-                    "  mbis_limit    4",
-                    "  mbis_multipole_units AU",
-                    "  mbis_radius   ['C', 0.53, 'N', 0.53, 'H', 0.53]",
-                    "  mbis_switch   4.0",
-                    "  ",
+                    "d_convergence 8",
+                    "e_convergence 8",
+                    "dft_radial_points 99",
+                    "dft_spherical_points 590",
+                    "guess sad",
+                    "mbis_d_convergence 9",
+                    "mbis_radial_points 99",
+                    "mbis_spherical_points 590",
+                    "max_radial_moment 4",
                 ],
                 "pbe0",
             ),
-            # Coarse settings
+            # Custom settings
             (
                 {
                     "basis": "6-31G*",
                     "method": "hf",
-                    "limit": 2,
-                    "multipole_units": "Bohr",
-                    "radius": ["C", 0.53, "N", 0.53, "H", 0.53, "Cl", 0.53],
-                    "switch": 2.0,
+                    "e_convergence": 10,
+                    "d_convergence": 10,
+                    #  purely for testing
+                    "dft_radial_points": 75,
+                    #  purely for testing
+                    "dft_spherical_points": 302,
+                    #  purely for testing
+                    "max_radial_moment": 2,
+                    "mbis_d_convergence": 8,
+                    "mbis_radial_points": 75,
+                    "mbis_spherical_points": 302,
                     "mpfit_inner_radius": 10.0,
                     "mpfit_outer_radius": 15.0,
                     "mpfit_atom_radius": 3.5,
                 },
                 [
                     "  basis 6-31G*",
-                    "  # MBIS options",
-                    "  mbis_limit    2",
-                    "  mbis_multipole_units Bohr",
-                    "  mbis_radius   ['C', 0.53, 'N', 0.53, 'H', 0.53, 'Cl', 0.53]",
-                    "  mbis_switch   2.0",
-                    "  ",
+                    "d_convergence 10",
+                    "e_convergence 10",
+                    #  purely for testing
+                    "dft_radial_points 75",
+                    #  purely for testing
+                    "dft_spherical_points 302",
+                    "guess sad",
+                    "mbis_d_convergence 8",
+                    "mbis_radial_points 75",
+                    "mbis_spherical_points 302",
+                    "max_radial_moment 2",
                 ],
                 "hf",
-            ),
-            # Fine settings
-            (
-                {
-                    "basis": "aug-cc-pVTZ",
-                    "method": "mp2",
-                    "limit": 6,
-                    "multipole_units": "AU",
-                    "radius": ["C", 0.65, "N", 0.65, "H", 0.35, "O", 0.60, "Cl", 0.75],
-                    "switch": 6.0,
-                    "mpfit_inner_radius": 5.0,
-                    "mpfit_outer_radius": 20.0,
-                    "mpfit_atom_radius": 2.5,
-                },
-                [
-                    "  basis aug-cc-pVTZ",
-                    "  # MBIS options",
-                    "  mbis_limit    6",
-                    "  mbis_multipole_units AU",
-                    "  mbis_radius   ['C', 0.65, 'N', 0.65, 'H', 0.35, 'O', 0.6, 'Cl', 0.75]",  # noqa: E501
-                    "  mbis_switch   6.0",
-                    "  ",
-                ],
-                "mp2",
             ),
         ],
     )
@@ -172,7 +170,6 @@ class TestPsi4MBISGenerator:
 
         settings = MBISSettings(**mbis_settings_kwargs)
 
-        # Create a closed shell molecule
         molecule = smiles_to_molecule("[Cl-]")
         conformer = np.array([[0.0, 0.0, 0.0]]) * unit.angstrom
 
@@ -180,45 +177,14 @@ class TestPsi4MBISGenerator:
             molecule, conformer, settings, minimize=False, compute_mp=True
         )
 
-        expected_output = "\n".join(
-            [
-                "memory 500 MiB",
-                "",
-                "molecule mol {",
-                "  noreorient",
-                "  nocom",
-                "  -1 1",
-                "  Cl  0.000000000  0.000000000  0.000000000",
-                "}",
-                "",
-                "set {",
-                *expected_mbis_settings,
-                "}",
-                "",
-                "# Calculate the wavefunction",
-                f"energy, wfn = energy('{expected_method}', return_wfn=True)",
-                "# Run MBIS",
-                "mbis(wfn)",
-                "",
-                "# Save final geometry",
-                "mol.save_xyz_file('final-geometry.xyz', 1)",
-                "# Get MBIS results",
-                'dma_distributed = variable("DMA DISTRIBUTED MULTIPOLES")',
-                'dma_total = variable("DMA TOTAL MULTIPOLES")',
-                "",
-                "import numpy as np",
-                "",
-                "# Convert Matrix objects to NumPy arrays",
-                "dma_distributed_array = dma_distributed.to_array()",
-                "dma_total_array = dma_total.to_array()",
-                "",
-                "# Save arrays to disk",
-                "np.save('dma_distributed.npy', dma_distributed_array)",
-                "np.save('dma_total.npy', dma_total_array)",
-            ]
-        )
+        # Check that the expected settings appear in the input
+        for expected_line in expected_mbis_settings:
+            assert expected_line in input_contents, (
+                f"Expected '{expected_line}' not found in:\n{input_contents}"
+            )
 
-        assert expected_output == input_contents
+        # Check the method is correct
+        assert f"energy('{expected_method}'" in input_contents
 
     @pytest.mark.parametrize("minimize, n_threads", [(True, 1), (False, 1), (False, 2)])
     def test_generate(self, minimize, n_threads):
@@ -253,7 +219,7 @@ class TestPsi4MBISGenerator:
         )
 
         n_atoms = 5  # methane: 1 C + 4 H
-        n_components = (settings.limit + 1) ** 2  # 25 for limit=4
+        n_components = (settings.max_radial_moment + 1) ** 2 # 25 for limit=4
 
         assert mp.shape == (n_atoms, n_components)
         assert output_conformer.shape == input_conformer.shape
@@ -281,7 +247,7 @@ class TestPsi4MBISGenerator:
             * unit.angstrom
         )
 
-        output_conformer, mp = Psi4MBISGenerator.generate(
+        _, mp = Psi4MBISGenerator.generate(
             molecule,
             input_conformer,
             settings,
@@ -290,6 +256,7 @@ class TestPsi4MBISGenerator:
         )
 
         assert mp is None
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

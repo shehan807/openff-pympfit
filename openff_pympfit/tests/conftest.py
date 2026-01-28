@@ -42,6 +42,19 @@ def default_gdma_settings():
 
 
 # =============================================================================
+# MBIS Settings Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def default_mbis_settings():
+    """Create default MBISSettings."""
+    from openff_pympfit import MBISSettings
+
+    return MBISSettings()
+
+
+# =============================================================================
 # Mock Multipole Data Fixtures
 # Ref: fork/_tests/charges/resp/test_resp.py::mock_esp_records
 # Pattern: Create mock data with known values for validation
