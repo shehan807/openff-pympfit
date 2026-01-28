@@ -7,6 +7,7 @@ from contextlib import AbstractContextManager, contextmanager
 
 from openff.toolkit import Molecule, Quantity
 from openff.toolkit.utils.exceptions import AtomMappingWarning
+from openff.units import unit
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
@@ -24,6 +25,8 @@ from openff_pympfit.gdma.storage.db import (
     DBSoftwareProvenance,
 )
 from openff_pympfit.gdma.storage.exceptions import IncompatibleDBVersion
+
+unit.define("AU = [] = au = atomic_unit")
 
 
 class MoleculeGDMARecord(BaseModel):
@@ -336,7 +339,7 @@ class MoleculeGDMAStore:
         records_by_smiles: dict[str, list[MoleculeGDMARecord]] = defaultdict(list)
 
         for record in records:
-            validated_record = MoleculeGDMARecord(**record.dict())
+            validated_record = MoleculeGDMARecord(**record.model_dump())
             smiles = self._tagged_to_canonical_smiles(validated_record.tagged_smiles)
 
             records_by_smiles[smiles].append(validated_record)

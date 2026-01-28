@@ -2,6 +2,13 @@ import numpy as np
 import pytest
 from openff.recharge.utilities.molecule import smiles_to_molecule
 from openff.units import unit
+from openff_pympfit import MBISSettings
+
+
+@pytest.fixture
+def default_mbis_settings():
+    """Default MBIS settings used by test_mbis.py input generation tests."""
+    return MBISSettings()
 
 
 class TestPsi4MBISGenerator:
@@ -219,7 +226,7 @@ class TestPsi4MBISGenerator:
         )
 
         n_atoms = 5  # methane: 1 C + 4 H
-        n_components = (settings.max_radial_moment + 1) ** 2 # 25 for limit=4
+        n_components = (settings.max_radial_moment + 1) ** 2  # 25 for limit=4
 
         assert mp.shape == (n_atoms, n_components)
         assert output_conformer.shape == input_conformer.shape

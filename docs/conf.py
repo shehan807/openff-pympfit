@@ -22,7 +22,8 @@ sys.path.insert(0, os.path.abspath(".."))
 
 project = "OpenFF PyMPFIT"
 copyright = (
-    "2026, Shehan M. Parmar. Project structure based on the "
+    "2026, Shehan M. Parmar. "
+    "Project structure based on the "
     "Computational Molecular Science Python Cookiecutter version 1.11"
 )
 author = "Shehan M. Parmar"
@@ -52,6 +53,7 @@ extensions = [
     "sphinx.ext.extlinks",
     "sphinx_design",
     "sphinx_copybutton",
+    "myst_parser",  # Markdown support (jobflow conf.py:40)
 ]
 
 
@@ -60,14 +62,20 @@ napoleon_google_docstring = False
 napoleon_use_param = False
 napoleon_use_ivar = True
 
+# MyST parser config - enable math with $ and $$
+myst_enable_extensions = [
+    "dollarmath",
+    "amsmath",
+]
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-# source_suffix = ['.rst', '.md']
-source_suffix = ".rst"
+# Support both RST and Markdown (jobflow conf.py:65)
+source_suffix = [".rst", ".md"]
 
 # The master toctree document.
 master_doc = "index"
@@ -77,7 +85,7 @@ master_doc = "index"
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = "en"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -93,18 +101,55 @@ pygments_style = "default"
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "pydata_sphinx_theme"
+html_theme = "furo"
 
-# Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
-# documentation.
-#
-# html_theme_options = {}
+# Furo theme options (jobflow conf.py:106-148)
+# Hide sphinx footer
+html_show_sphinx = False
+html_show_sourcelink = False
+
+# Font stack (jobflow conf.py:112-122)
+fonts = [
+    "Lato",
+    "-apple-system",
+    "BlinkMacSystemFont",
+    "Segoe UI",
+    "Helvetica",
+    "Arial",
+    "sans-serif",
+]
+
+html_theme_options = {
+    "light_css_variables": {
+        "admonition-font-size": "92%",
+        "admonition-title-font-size": "92%",
+        "font-stack": ",".join(fonts),
+        "font-size--small": "92%",
+        "font-size--small--2": "87.5%",
+        "font-size--small--3": "87.5%",
+        "font-size--small--4": "87.5%",
+    },
+    "dark_css_variables": {
+        "admonition-font-size": "92%",
+        "admonition-title-font-size": "92%",
+        "font-stack": ",".join(fonts),
+        "font-size--small": "92%",
+        "font-size--small--2": "87.5%",
+        "font-size--small--3": "87.5%",
+        "font-size--small--4": "87.5%",
+    },
+    "light_logo": "pympfit_logo.png",
+    "dark_logo": "pympfit_logo.png",
+    "sidebar_hide_name": True,  # Logo already has the name
+}
+
+html_title = "OpenFF PyMPFIT"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+html_css_files = ["custom.css"]  # (jobflow conf.py:124)
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.

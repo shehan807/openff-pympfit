@@ -1,12 +1,12 @@
-# OpenFF PyMPFIT
+<div align="center">
 
-<!-- Logo placeholder -->
-<!-- ![OpenFF PyMPFIT Logo](docs/_static/logo.png) -->
+<img src="docs/_static/pympfit_logo.png" alt="OpenFF PyMPFIT" width="400">
 
-[//]: # (Badges)
 [![GitHub Actions Build Status](https://github.com/shehan807/openff-pympfit/actions/workflows/ci.yaml/badge.svg)](https://github.com/shehan807/openff-pympfit/actions/workflows/ci.yaml)
 [![codecov](https://codecov.io/gh/shehan807/openff-pympfit/branch/main/graph/badge.svg)](https://codecov.io/gh/shehan807/openff-pympfit)
 [![Documentation Status](https://readthedocs.org/projects/openff-pympfit/badge/?version=latest)](https://openff-pympfit.readthedocs.io/en/latest/?badge=latest)
+
+</div>
 
 OpenFF-PyMPFIT is a free, open-source software for performing partial atomic charge fitting using the Gaussian distributed multipole analysis (GDMA). Features include:
 
@@ -18,18 +18,6 @@ OpenFF-PyMPFIT is a free, open-source software for performing partial atomic cha
 
 ## Installation
 
-**Install from conda-forge (recommended):**
-
-```bash
-conda install -c conda-forge openff-pympfit
-```
-
-**Note:** GDMA functionality requires Psi4 and PyGDMA:
-
-```bash
-conda install -c conda-forge psi4 pygdma
-```
-
 **Install from source:**
 
 ```bash
@@ -37,6 +25,12 @@ git clone https://github.com/shehan807/openff-pympfit.git
 cd openff-pympfit
 conda install -c conda-forge openff-recharge # no pip package for openff-recharge
 pip install -e .
+```
+
+**Note:** GDMA functionality requires Psi4 and PyGDMA:
+
+```bash
+pip install psi4 pygdma
 ```
 
 ## Quick Example

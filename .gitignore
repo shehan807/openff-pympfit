@@ -129,8 +129,11 @@ spice-gdma.log
 *.hdf5
 *.h5py
 
-# output files 
+# output files
 final-geometry.xyz
 input.dat
 output.dat
 timer.dat
+
+# Psi4 temporary files
+psi.*.clean

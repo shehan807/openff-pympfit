@@ -118,7 +118,6 @@ class TestPsi4GDMAGenerator:
                     "basis": "6-31G*",
                     "method": "hf",
                     "limit": 2,
-                    "multipole_units": "Bohr",
                     "radius": ["C", 0.53, "N", 0.53, "H", 0.53, "Cl", 0.53],
                     "switch": 2.0,
                     "mpfit_inner_radius": 10.0,
@@ -129,7 +128,7 @@ class TestPsi4GDMAGenerator:
                     "  basis 6-31G*",
                     "  # GDMA options",
                     "  gdma_limit    2",
-                    "  gdma_multipole_units Bohr",
+                    "  gdma_multipole_units AU",
                     "  gdma_radius   ['C', 0.53, 'N', 0.53, 'H', 0.53, 'Cl', 0.53]",
                     "  gdma_switch   2.0",
                     "  ",
@@ -142,7 +141,6 @@ class TestPsi4GDMAGenerator:
                     "basis": "aug-cc-pVTZ",
                     "method": "mp2",
                     "limit": 6,
-                    "multipole_units": "AU",
                     "radius": ["C", 0.65, "N", 0.65, "H", 0.35, "O", 0.60, "Cl", 0.75],
                     "switch": 6.0,
                     "mpfit_inner_radius": 5.0,
@@ -288,5 +286,4 @@ class TestPsi4GDMAGenerator:
             minimize=False,
             compute_mp=False,
         )
-
         assert mp is None

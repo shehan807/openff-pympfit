@@ -2,8 +2,6 @@ from collections.abc import Generator
 from typing import Union
 
 import numpy as np
-from openff.recharge.charges.library import LibraryChargeCollection
-from openff.recharge.charges.qc import QCChargeGenerator, QCChargeSettings
 from openff.recharge.charges.vsite import (
     VirtualSiteChargeKey,
     VirtualSiteCollection,
@@ -69,45 +67,9 @@ class MPFITObjective(Objective):
         return MPFITObjectiveTerm
 
     @classmethod
-    def _flatten_charges(cls) -> bool:
-        return False
-
-    @classmethod
-    def _compute_design_matrix_precursor(
-        cls, _grid_coordinates: np.ndarray, conformer: np.ndarray
-    ) -> np.ndarray:
-        """Build design matrix precursor for MPFIT.
-
-        For MPFIT, the design matrix precursor is calculated differently than
-        for ESP or electric fields. We use molecular coordinates to build a
-        matrix that maps charges to multipole moments.
-
-        The implementation constructs the A matrix as described in
-        J. Comp. Chem. Vol. 12, No. 8, 913-917 (1991).
-        """
-        # For MPFIT, we build the design matrix directly in compute_objective_terms
-        # This is a placeholder to satisfy the interface
-        return np.ones((1, conformer.shape[0]))
-
-    @classmethod
-    def _electrostatic_property(cls, record: MoleculeGDMARecord) -> np.ndarray:
-        from openff_pympfit.mpfit.core import _convert_flat_to_hierarchical
-
-        # Convert flat multipoles to hierarchical format for the solver
-        # Determine the number of sites and max rank from the multipoles array
-        flat_multipoles = record.multipoles
-        num_sites = flat_multipoles.shape[0]
-        max_rank = 4  # Default max rank for GDMA
-
-        # Convert from flat to hierarchical format
-        return _convert_flat_to_hierarchical(flat_multipoles, num_sites, max_rank)
-
-    @classmethod
     def compute_objective_terms(
         cls,
         records: list[MultipoleRecord],
-        charge_collection: None | (QCChargeSettings | LibraryChargeCollection) = None,
-        charge_parameter_keys: list[tuple[str, tuple[int, ...]]] | None = None,
         vsite_collection: VirtualSiteCollection | None = None,
         _vsite_charge_parameter_keys: list[VirtualSiteChargeKey] | None = None,
         _vsite_coordinate_parameter_keys: list[VirtualSiteGeometryKey] | None = None,
@@ -150,102 +112,66 @@ class MPFITObjective(Objective):
                 flat_multipoles, num_sites, max_rank
             )
 
-            fixed_atom_charges = np.zeros((molecule.n_atoms, 1))
             atom_charge_design_matrices = []
 
-            # We'll use the molecular coordinates as our design matrix precursor
-            # This is just a placeholder to match the interface
-            _design_matrix_precursor = cls._compute_design_matrix_precursor(
-                None, conformer
-            )
+            # Convert conformer from Angstroms to Bohrs
+            bohr_conformer = unit.convert(conformer, unit.angstrom, unit.bohr)
 
-            if charge_collection is None:
-                pass
-            elif isinstance(charge_collection, QCChargeSettings):
-                if charge_parameter_keys is not None:
-                    msg = "charges generated using `QCChargeSettings` cannot be trained"
-                    raise ValueError(msg)
+            # Create rvdw array using the configured default atom radius
+            rvdw = np.full(molecule.n_atoms, default_atom_radius)
 
-                fixed_atom_charges += QCChargeGenerator.generate(
-                    molecule, [conformer * unit.angstrom], charge_collection
+            # Prepare the reference values and quse_masks
+            reference_values = []
+            quse_masks = []
+
+            # Process each atom site
+            for i in range(molecule.n_atoms):
+                # Calculate distances from current multipole site to all atoms
+                rqm = np.linalg.norm(bohr_conformer[i] - bohr_conformer, axis=1)
+                # Create mask for atoms within rvdw
+                quse_mask = rqm < rvdw[i]
+
+                # Store the mask for later use by the solver
+                quse_masks.append(quse_mask)
+
+                qsites = np.count_nonzero(quse_mask)
+
+                # Build the A matrix for this site's multipoles
+                site_A = np.zeros((qsites, qsites))
+                site_b = np.zeros(qsites)
+
+                # Apply the mask to get charge positions to use
+                masked_charge_conformer = bohr_conformer[quse_mask]
+
+                # If no charges are within range, use all charges
+                if masked_charge_conformer.shape[0] == 0:
+                    masked_charge_conformer = bohr_conformer
+                    # Update the mask to include all atoms
+                    quse_masks[-1] = np.ones(molecule.n_atoms, dtype=bool)
+
+                # Use the multipole site coordinates and masked charge coordinates
+                site_A = build_A_matrix(
+                    i,
+                    bohr_conformer,
+                    masked_charge_conformer,
+                    r1,
+                    r2,
+                    max_rank,
+                    site_A,
+                )
+                site_b = build_b_vector(
+                    i,
+                    bohr_conformer,
+                    masked_charge_conformer,
+                    r1,
+                    r2,
+                    max_rank,
+                    multipoles,
+                    site_b,
                 )
 
-            elif isinstance(charge_collection, LibraryChargeCollection):
-                (
-                    library_assignment_matrix,
-                    library_fixed_charges,
-                ) = cls._compute_library_charge_terms(
-                    molecule,
-                    charge_collection,
-                    charge_parameter_keys,
-                )
-
-                fixed_atom_charges += library_fixed_charges
-
-                # Convert conformer from Angstroms to Bohrs once
-                bohr_conformer = unit.convert(conformer, unit.angstrom, unit.bohr)
-
-                # Create rvdw array using the configured default atom radius
-                rvdw = np.full(molecule.n_atoms, default_atom_radius)
-
-                # Compute the reference values (b vector)
-                if cls._flatten_charges():
-                    fixed_atom_charges = fixed_atom_charges.flatten()
-
-                # Prepare the reference values and quse_masks
-                reference_values = []
-                quse_masks = []
-
-                # Process each atom site
-                for i in range(molecule.n_atoms):
-                    # Calculate distances from current multipole site to all atoms
-                    rqm = np.linalg.norm(bohr_conformer[i] - bohr_conformer, axis=1)
-                    # Create mask for atoms within rvdw
-                    quse_mask = rqm < rvdw[i]
-
-                    # Store the mask for later use by the solver
-                    quse_masks.append(quse_mask)
-
-                    qsites = np.count_nonzero(quse_mask)
-
-                    # Build the A matrix for this site's multipoles
-                    site_A = np.zeros((qsites, qsites))
-                    site_b = np.zeros(qsites)
-
-                    # Apply the mask to get charge positions to use
-                    masked_charge_conformer = bohr_conformer[quse_mask]
-
-                    # If no charges are within range, use all charges
-                    if masked_charge_conformer.shape[0] == 0:
-                        masked_charge_conformer = bohr_conformer
-                        # Update the mask to include all atoms
-                        quse_masks[-1] = np.ones(molecule.n_atoms, dtype=bool)
-
-                    # Use the multipole site coordinates and masked charge coordinates
-                    site_A = build_A_matrix(
-                        i,
-                        bohr_conformer,
-                        masked_charge_conformer,
-                        r1,
-                        r2,
-                        max_rank,
-                        site_A,
-                    )
-                    site_b = build_b_vector(
-                        i,
-                        bohr_conformer,
-                        masked_charge_conformer,
-                        r1,
-                        r2,
-                        max_rank,
-                        multipoles,
-                        site_b,
-                    )
-
-                    atom_charge_design_matrices.append(site_A)
-                    reference_values.append(site_b)
-            else:
-                raise NotImplementedError
+                atom_charge_design_matrices.append(site_A)
+                reference_values.append(site_b)
 
             # We don't currently support virtual sites for MPFIT
             if vsite_collection is not None:
