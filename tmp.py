@@ -28,7 +28,10 @@ print(f"Charges: {charges.value}")
 # Generate MBIS multipoles (requires Psi4)
 settings = MBISSettings()
 coords, multipoles = Psi4MBISGenerator.generate(molecule, conformer, settings, compute_mp=True)
+print("Coords:", coords)
+print("Multipoles", multipoles)
 record = MoleculeGDMARecord.from_molecule(molecule, coords, multipoles, settings)
+print(record)
 
 # Fit charges
 charges = generate_mpfit_charge_parameter([record], MPFITSVDSolver())

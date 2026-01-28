@@ -131,7 +131,7 @@ class MBISGenerator(abc.ABC):
         minimize: bool = False,
         compute_mp: bool = True,
         n_threads: int = 1,
-        memory: Quantity = 500 * unit.mebibytes,
+        memory: Quantity = 32 * unit.gigabytes,
     ) -> tuple[Quantity, Quantity]:
         """Generate the MBIS multipole moments for a molecule.
 
