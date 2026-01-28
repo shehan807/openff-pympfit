@@ -16,6 +16,7 @@ from openff_pympfit.mbis import MBISGenerator, MBISSettings
 if TYPE_CHECKING:
     from openff.toolkit import Molecule
 
+
 class Psi4MBISGenerator(MBISGenerator):
     """Compute the multipole moments of a molecule using Psi4."""
 
@@ -108,7 +109,6 @@ class Psi4MBISGenerator(MBISGenerator):
             "mbis_radial_points": settings.mbis_radial_points,
             "mbis_spherical_points": settings.mbis_spherical_points,
             "max_radial_moment": settings.max_radial_moment,
-
         }
 
         # Remove the white space after the for loop
@@ -156,7 +156,39 @@ class Psi4MBISGenerator(MBISGenerator):
 
             mp = None
             if compute_mp:
-                mp = np.load("dma_distributed.npy")
+                # Load MBIS multipoles and combine into a single array
+                # The array format should match GDMA: (n_atoms, n_components)
+                # where n_components = (max_radial_moment + 1)^2
+                mbis_charges = np.load("mbis_charges.npy")
+                n_atoms = len(mbis_charges)
+                max_moment = settings.max_radial_moment
+
+                # Calculate total components: 1 + 3 + 5 + 7 = 16 for max_moment=4
+                # or (max_moment + 1)^2 = 25 for spherical harmonics convention
+                n_components = (max_moment + 1) ** 2
+                mp = np.zeros((n_atoms, n_components))
+
+                # Monopole (charge) - 1 component
+                mp[:, 0] = mbis_charges
+
+                # Dipoles - 3 components (if available)
+                if max_moment > 1 and os.path.exists("mbis_dipoles.npy"):
+                    mbis_dipoles = np.load("mbis_dipoles.npy")
+                    mp[:, 1:4] = mbis_dipoles
+
+                # Quadrupoles - 5 components (if available)
+                if max_moment > 2 and os.path.exists("mbis_quadrupoles.npy"):
+                    mbis_quadrupoles = np.load("mbis_quadrupoles.npy")
+                    # Quadrupoles have 6 unique components in Cartesian,
+                    # but we store 5 in spherical harmonics
+                    mp[:, 4:9] = mbis_quadrupoles[:, :5]
+
+                # Octupoles - 7 components (if available)
+                if max_moment > 3 and os.path.exists("mbis_octupoles.npy"):
+                    mbis_octupoles = np.load("mbis_octupoles.npy")
+                    # Octupoles have 10 unique components in Cartesian,
+                    # but we store 7 in spherical harmonics
+                    mp[:, 9:16] = mbis_octupoles[:, :7]
 
             with open("final-geometry.xyz") as file:
                 output_lines = file.read().splitlines(keepends=False)

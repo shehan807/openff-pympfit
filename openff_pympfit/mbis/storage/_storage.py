@@ -1,4 +1,4 @@
-"""Store and retrieve calculated GDMA data in unified data collections."""
+"""Store and retrieve calculated MBIS data in unified data collections."""
 
 import functools
 import warnings
@@ -12,24 +12,24 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from openff_pympfit._annotations import MP, Coordinates
-from openff_pympfit.gdma import GDMASettings
-from openff_pympfit.gdma.storage.db import (
+from openff_pympfit.mbis import MBISSettings
+from openff_pympfit.mbis.storage.db import (
     DB_VERSION,
     DBBase,
     DBConformerRecord,
-    DBGDMASettings,
+    DBMBISSettings,
     DBGeneralProvenance,
     DBInformation,
     DBMoleculeRecord,
     DBSoftwareProvenance,
 )
-from openff_pympfit.gdma.storage.exceptions import IncompatibleDBVersion
+from openff_pympfit.mbis.storage.exceptions import IncompatibleDBVersion
 
 
-class MoleculeGDMARecord(BaseModel):
-    """Record containing GDMA results for a molecule conformer.
+class MoleculeMBISRecord(BaseModel):
+    """Record containing MBIS results for a molecule conformer.
 
-    Includes molecule information, conformer coordinates, GDMA settings
+    Includes molecule information, conformer coordinates, MBIS settings
     provenance, and multipole values for each atom.
     """
 
@@ -53,8 +53,8 @@ class MoleculeGDMARecord(BaseModel):
         description="The multipole moments [AU] for each atom in the molecule.",
     )
 
-    gdma_settings: GDMASettings = Field(
-        ..., description="The settings used to generate the GDMA stored in this record."
+    mbis_settings: MBISSettings = Field(
+        ..., description="The settings used to generate the MBIS stored in this record."
     )
 
     @property
@@ -71,9 +71,9 @@ class MoleculeGDMARecord(BaseModel):
         molecule: Molecule,
         conformer: Quantity,
         multipoles: Quantity,
-        gdma_settings: GDMASettings,
-    ) -> "MoleculeGDMARecord":
-        """Create a new ``MoleculeGDMARecord`` from an existing molecule.
+        mbis_settings: MBISSettings,
+    ) -> "MoleculeMBISRecord":
+        """Create a new ``MoleculeMBISRecord`` from an existing molecule.
 
         Takes care of creating the InChI and SMARTS representations.
 
@@ -85,8 +85,8 @@ class MoleculeGDMARecord(BaseModel):
             The coordinates [Angstrom] of this conformer with shape=(n_atoms, 3).
         multipoles
             The multipole moments [AU] for each atom in the molecule.
-        gdma_settings
-            The settings used to generate the GDMA stored in this record.
+        mbis_settings
+            The settings used to generate the MBIS stored in this record.
 
         Returns
         -------
@@ -96,16 +96,16 @@ class MoleculeGDMARecord(BaseModel):
             isomeric=True, explicit_hydrogens=True, mapped=True
         )
 
-        return MoleculeGDMARecord(
+        return MoleculeMBISRecord(
             tagged_smiles=tagged_smiles,
             conformer=conformer,
             multipoles=multipoles,
-            gdma_settings=gdma_settings,
+            mbis_settings=mbis_settings,
         )
 
 
-class MoleculeGDMAStore:
-    """Store and retrieve GDMA results for molecules in multiple conformers.
+class MoleculeMBISStore:
+    """Store and retrieve MBIS results for molecules in multiple conformers.
 
     This class currently can only store the data in a SQLite database.
     """
@@ -139,10 +139,10 @@ class MoleculeGDMAStore:
 
     def __init__(
         self,
-        database_path: str = "gdma-store.sqlite",
+        database_path: str = "mbis-store.sqlite",
         cache_size: None | int = None,
     ) -> None:
-        """Initialize the GDMA store.
+        """Initialize the MBIS store.
 
         Parameters
         ----------
@@ -233,7 +233,7 @@ class MoleculeGDMAStore:
     @classmethod
     def _db_records_to_model(
         cls, db_records: list[DBMoleculeRecord]
-    ) -> list[MoleculeGDMARecord]:
+    ) -> list[MoleculeMBISRecord]:
         """Map a set of database records into their corresponding data models.
 
         Parameters
@@ -247,11 +247,11 @@ class MoleculeGDMAStore:
         """
         # noinspection PyTypeChecker
         return [
-            MoleculeGDMARecord(
+            MoleculeMBISRecord(
                 tagged_smiles=db_conformer.tagged_smiles,
                 conformer=db_conformer.coordinates,
                 multipoles=db_conformer.multipoles,
-                gdma_settings=DBGDMASettings.db_to_instance(db_conformer.gdma_settings),
+                mbis_settings=DBMBISSettings.db_to_instance(db_conformer.mbis_settings),
             )
             for db_record in db_records
             for db_conformer in db_record.conformers
@@ -259,7 +259,7 @@ class MoleculeGDMAStore:
 
     @classmethod
     def _store_smiles_records(
-        cls, db: Session, smiles: str, records: list[MoleculeGDMARecord]
+        cls, db: Session, smiles: str, records: list[MoleculeMBISRecord]
     ) -> DBMoleculeRecord:
         """Store a set of records which all store information for the same molecule.
 
@@ -288,7 +288,7 @@ class MoleculeGDMAStore:
                 tagged_smiles=record.tagged_smiles,
                 coordinates=record.conformer,
                 multipoles=record.multipoles,
-                gdma_settings=DBGDMASettings.unique(db, record.gdma_settings),
+                mbis_settings=DBMBISSettings.unique(db, record.mbis_settings),
             )
             for record in records
         )
@@ -320,8 +320,8 @@ class MoleculeGDMAStore:
                 tagged_smiles, allow_undefined_stereo=True
             ).to_smiles(isomeric=False, explicit_hydrogens=False, mapped=False)
 
-    def store(self, *records: MoleculeGDMARecord) -> None:
-        """Store the GDMA calculated for a given molecule in the data store.
+    def store(self, *records: MoleculeMBISRecord) -> None:
+        """Store the MBIS calculated for a given molecule in the data store.
 
         Parameters
         ----------
@@ -333,10 +333,10 @@ class MoleculeGDMAStore:
             The records as they appear in the store.
         """
         # Validate and re-partition the records by their smiles patterns.
-        records_by_smiles: dict[str, list[MoleculeGDMARecord]] = defaultdict(list)
+        records_by_smiles: dict[str, list[MoleculeMBISRecord]] = defaultdict(list)
 
         for record in records:
-            validated_record = MoleculeGDMARecord(**record.dict())
+            validated_record = MoleculeMBISRecord(**record.dict())
             smiles = self._tagged_to_canonical_smiles(validated_record.tagged_smiles)
 
             records_by_smiles[smiles].append(validated_record)
@@ -351,7 +351,7 @@ class MoleculeGDMAStore:
         smiles: str | None = None,
         basis: str | None = None,
         method: str | None = None,
-    ) -> list[MoleculeGDMARecord]:
+    ) -> list[MoleculeMBISRecord]:
         """Retrieve records stored in this data store.
 
         Optionally filters according to a set of criteria.
@@ -368,13 +368,13 @@ class MoleculeGDMAStore:
 
                 if basis is not None or method is not None:
                     db_records = db_records.join(
-                        DBGDMASettings, DBConformerRecord.gdma_settings
+                        DBMBISSettings, DBConformerRecord.mbis_settings
                     )
 
                     if basis is not None:
-                        db_records = db_records.filter(DBGDMASettings.basis == basis)
+                        db_records = db_records.filter(DBMBISSettings.basis == basis)
                     if method is not None:
-                        db_records = db_records.filter(DBGDMASettings.method == method)
+                        db_records = db_records.filter(DBMBISSettings.method == method)
 
             db_records = db_records.all()
 
@@ -382,13 +382,13 @@ class MoleculeGDMAStore:
 
             if basis:
                 records = [
-                    record for record in records if record.gdma_settings.basis == basis
+                    record for record in records if record.mbis_settings.basis == basis
                 ]
             if method:
                 records = [
                     record
                     for record in records
-                    if record.gdma_settings.method == method
+                    if record.mbis_settings.method == method
                 ]
 
             return records

@@ -1,5 +1,5 @@
-"""Store GDMA data in SQLite databases."""
+"""Store MBIS data in SQLite databases."""
 
-from openff_pympfit.gdma.storage._storage import MoleculeGDMARecord, MoleculeGDMAStore
+from openff_pympfit.mbis.storage._storage import MoleculeMBISRecord, MoleculeMBISStore
 
-__all__ = ["MoleculeGDMARecord", "MoleculeGDMAStore"]
+__all__ = ["MoleculeMBISRecord", "MoleculeMBISStore"]

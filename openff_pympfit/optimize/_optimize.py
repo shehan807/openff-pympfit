@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from typing import Union
 
 import numpy as np
 from openff.recharge.charges.library import LibraryChargeCollection
@@ -12,6 +13,10 @@ from openff.recharge.optimize._optimize import Objective, ObjectiveTerm
 from openff.units import unit
 
 from openff_pympfit.gdma.storage import MoleculeGDMARecord
+from openff_pympfit.mbis.storage import MoleculeMBISRecord
+
+# Type alias for records that can be used with MPFIT
+MultipoleRecord = Union[MoleculeGDMARecord, MoleculeMBISRecord]
 
 
 class MPFITObjectiveTerm(ObjectiveTerm):
@@ -25,6 +30,31 @@ class MPFITObjectiveTerm(ObjectiveTerm):
     @classmethod
     def _objective(cls) -> type["MPFITObjective"]:
         return MPFITObjective
+
+
+def _get_settings_from_record(record: MultipoleRecord):
+    """Extract settings from either GDMA or MBIS record.
+
+    Returns a tuple of (max_rank, r1, r2, default_atom_radius).
+    """
+    if isinstance(record, MoleculeGDMARecord):
+        settings = record.gdma_settings
+        return (
+            settings.limit,
+            settings.mpfit_inner_radius,
+            settings.mpfit_outer_radius,
+            settings.mpfit_atom_radius,
+        )
+    elif isinstance(record, MoleculeMBISRecord):
+        settings = record.mbis_settings
+        return (
+            settings.limit,
+            settings.mpfit_inner_radius,
+            settings.mpfit_outer_radius,
+            settings.mpfit_atom_radius,
+        )
+    else:
+        raise TypeError(f"Unknown record type: {type(record)}")
 
 
 class MPFITObjective(Objective):
@@ -75,7 +105,7 @@ class MPFITObjective(Objective):
     @classmethod
     def compute_objective_terms(
         cls,
-        gdma_records: list[MoleculeGDMARecord],
+        records: list[MultipoleRecord],
         charge_collection: None | (QCChargeSettings | LibraryChargeCollection) = None,
         charge_parameter_keys: list[tuple[str, tuple[int, ...]]] | None = None,
         vsite_collection: VirtualSiteCollection | None = None,
@@ -88,6 +118,11 @@ class MPFITObjective(Objective):
         This is an adaptation of the original compute_objective_terms method for MPFIT,
         which works with multipole moments instead of ESP data.
 
+        Parameters
+        ----------
+        records
+            The multipole records (either GDMA or MBIS) to compute objective terms for.
+
         For complete documentation, see the original method in the Objective class.
         Note: BCC parameters are not applicable for MPFIT and have been removed.
         """
@@ -99,21 +134,17 @@ class MPFITObjective(Objective):
             build_b_vector,
         )
 
-        for gdma_record in gdma_records:
+        for record in records:
             molecule: Molecule = Molecule.from_mapped_smiles(
-                gdma_record.tagged_smiles, allow_undefined_stereo=True
+                record.tagged_smiles, allow_undefined_stereo=True
             )
-            conformer = gdma_record.conformer
+            conformer = record.conformer
 
-            # Get MPFIT settings from the record
-            gdma_settings = gdma_record.gdma_settings
-            max_rank = gdma_settings.limit
-            r1 = gdma_settings.mpfit_inner_radius
-            r2 = gdma_settings.mpfit_outer_radius
-            default_atom_radius = gdma_settings.mpfit_atom_radius
+            # Get MPFIT settings from the record (works for both GDMA and MBIS)
+            max_rank, r1, r2, default_atom_radius = _get_settings_from_record(record)
 
             # Convert the flat multipoles to hierarchical format
-            flat_multipoles = gdma_record.multipoles
+            flat_multipoles = record.multipoles
             num_sites = flat_multipoles.shape[0]
             multipoles = _convert_flat_to_hierarchical(
                 flat_multipoles, num_sites, max_rank

@@ -1,5 +1,5 @@
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from openff.recharge.charges.library import (
     LibraryChargeCollection,
@@ -13,11 +13,15 @@ from openff.toolkit.utils.exceptions import AtomMappingWarning
 from openff.units import unit
 
 from openff_pympfit.gdma.storage import MoleculeGDMARecord
+from openff_pympfit.mbis.storage import MoleculeMBISRecord
 from openff_pympfit.mpfit.solvers import MPFITSolver
 from openff_pympfit.optimize import MPFITObjective, MPFITObjectiveTerm
 
 if TYPE_CHECKING:
     from openff.toolkit import Molecule
+
+# Type alias for records that can be used with MPFIT
+MultipoleRecord = Union[MoleculeGDMARecord, MoleculeMBISRecord]
 
 
 def _generate_dummy_values(smiles: str) -> list[float]:
@@ -96,14 +100,15 @@ def molecule_to_mpfit_library_charge(
 
 
 def generate_mpfit_charge_parameter(
-    gdma_records: list[MoleculeGDMARecord], solver: MPFITSolver | None
+    records: list[MultipoleRecord], solver: MPFITSolver | None
 ) -> LibraryChargeParameter:
     """Generate point charges that reproduce the distributed multipole analysis data.
 
     Parameters
     ----------
-    gdma_records
-        The records containing the distributed multipole data.
+    records
+        The records containing the distributed multipole data. Can be either
+        MoleculeGDMARecord or MoleculeMBISRecord objects.
     solver
         The solver to use when finding the charges that minimize the MPFIT loss
         function. By default, the SVD solver is used.
@@ -123,10 +128,10 @@ def generate_mpfit_charge_parameter(
         Molecule.from_mapped_smiles(
             record.tagged_smiles, allow_undefined_stereo=True
         ).to_smiles(mapped=False)
-        for record in gdma_records
+        for record in records
     }
     if len(unique_smiles) != 1:
-        msg = "all GDMA records must be generated for the same molecule"
+        msg = "all records must be generated for the same molecule"
         raise ValueError(msg)
 
     molecule = Molecule.from_smiles(
@@ -143,7 +148,7 @@ def generate_mpfit_charge_parameter(
     # Generate the design matrices and reference data
     objective_terms_and_masks = list(
         MPFITObjective.compute_objective_terms(
-            gdma_records,
+            records,
             charge_collection=LibraryChargeCollection(parameters=[mpfit_parameter]),
             charge_parameter_keys=[
                 (mpfit_parameter.smiles, tuple(range(len(mpfit_parameter.value))))
