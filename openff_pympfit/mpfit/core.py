@@ -61,72 +61,81 @@ def _regular_solid_harmonic(
     x: NDArray[np.float64],
     y: NDArray[np.float64],
     z: NDArray[np.float64],
+    xp=np,
 ) -> NDArray[np.float64]:
-    """Evaluate regular solid harmonics using scipy."""
-    x = np.asarray(x, dtype=np.float64)
-    y = np.asarray(y, dtype=np.float64)
-    z = np.asarray(z, dtype=np.float64)
+    """Evaluate regular solid harmonics using scipy or JAX."""
+    x = xp.asarray(x, dtype=xp.float64)
+    y = xp.asarray(y, dtype=xp.float64)
+    z = xp.asarray(z, dtype=xp.float64)
 
-    r = np.sqrt(x * x + y * y + z * z)
-    result = np.zeros_like(r)
+    r = xp.sqrt(x * x + y * y + z * z)
     nonzero = r > 1e-10
 
-    if l == 0 and m == 0 and cs == 0:
-        result[~nonzero] = 1.0
+    origin_value = 1.0 if (l == 0 and m == 0 and cs == 0) else 0.0
 
-    if not np.any(nonzero):
-        return result
+    if xp is np and not xp.any(nonzero):
+        return xp.full_like(r, origin_value)
 
-    xn, yn, zn, rn = x[nonzero], y[nonzero], z[nonzero], r[nonzero]
+    r_safe = xp.where(nonzero, r, 1.0)
 
     if l == 4:
         if m == 0:
             val = 0.125 * (
-                8.0 * zn**4
-                - 24.0 * (xn**2 + yn**2) * zn**2
-                + 3.0 * (xn**4 + 2.0 * xn**2 * yn**2 + yn**4)
+                8.0 * z**4
+                - 24.0 * (x**2 + y**2) * z**2
+                + 3.0 * (x**4 + 2.0 * x**2 * y**2 + y**4)
             )
         elif m == 1 and cs == 0:
             val = (
                 0.25
-                * np.sqrt(10.0)
-                * (4.0 * xn * zn**3 - 3.0 * xn * zn * (xn**2 + yn**2))
+                * xp.sqrt(10.0)
+                * (4.0 * x * z**3 - 3.0 * x * z * (x**2 + y**2))
             )
         elif m == 1 and cs == 1:
             val = (
                 0.25
-                * np.sqrt(10.0)
-                * (4.0 * yn * zn**3 - 3.0 * yn * zn * (xn**2 + yn**2))
+                * xp.sqrt(10.0)
+                * (4.0 * y * z**3 - 3.0 * y * z * (x**2 + y**2))
             )
         elif m == 2 and cs == 0:
-            val = 0.25 * np.sqrt(5.0) * (xn**2 - yn**2) * (6.0 * zn**2 - xn**2 - yn**2)
+            val = 0.25 * xp.sqrt(5.0) * (x**2 - y**2) * (6.0 * z**2 - x**2 - y**2)
         elif m == 2 and cs == 1:
-            val = 0.25 * np.sqrt(5.0) * xn * yn * (6.0 * zn**2 - xn**2 - yn**2)
+            val = 0.25 * xp.sqrt(5.0) * x * y * (6.0 * z**2 - x**2 - y**2)
         elif m == 3 and cs == 0:
-            val = 0.25 * np.sqrt(70.0) * zn * (xn**3 - 3.0 * xn * yn**2)
+            val = 0.25 * xp.sqrt(70.0) * z * (x**3 - 3.0 * x * y**2)
         elif m == 3 and cs == 1:
-            val = 0.25 * np.sqrt(70.0) * zn * (3.0 * xn**2 * yn - yn**3)
+            val = 0.25 * xp.sqrt(70.0) * z * (3.0 * x**2 * y - y**3)
         elif m == 4 and cs == 0:
-            val = 0.125 * np.sqrt(35.0) * (xn**4 - 6.0 * xn**2 * yn**2 + yn**4)
+            val = 0.125 * xp.sqrt(35.0) * (x**4 - 6.0 * x**2 * y**2 + y**4)
         elif m == 4 and cs == 1:
-            val = 0.125 * np.sqrt(35.0) * xn * yn * (xn**2 - yn**2)
+            val = 0.125 * xp.sqrt(35.0) * x * y * (x**2 - y**2)
         else:
-            val = np.zeros_like(rn)
-        result[nonzero] = val
-        return result
+            val = xp.zeros_like(r)
+        return xp.where(nonzero, val, origin_value)
 
-    theta = np.arccos(zn / rn)
-    phi = np.arctan2(yn, xn)
-    Y = sph_harm_y(l, m, theta, phi)
-    norm = np.sqrt(4.0 * np.pi / (2.0 * l + 1.0))
+    theta = xp.arccos(z / r_safe)
+    phi = xp.arctan2(y, x)
+
+    if xp is np:
+        Y = sph_harm_y(l, m, theta, phi)
+    else:
+        from jax.scipy.special import sph_harm_y as jax_sph_harm_y
+        theta_1d = xp.atleast_1d(theta)
+        phi_1d = xp.atleast_1d(phi)
+        n_arr = xp.full_like(theta_1d, l, dtype=xp.int32)
+        m_arr = xp.full_like(theta_1d, m, dtype=xp.int32)
+        Y = jax_sph_harm_y(n_arr, m_arr, theta_1d, phi_1d, n_max=l)
+        Y = Y.reshape(theta.shape)
+
+    norm = xp.sqrt(4.0 * xp.pi / (2.0 * l + 1.0))
 
     if m == 0:
-        result[nonzero] = norm * rn**l * Y.real
+        val = norm * r_safe**l * Y.real
     else:
-        factor = np.sqrt(2.0) * ((-1.0) ** m) * norm * rn**l
-        result[nonzero] = factor * (Y.real if cs == 0 else Y.imag)
+        factor = xp.sqrt(2.0) * ((-1.0) ** m) * norm * r_safe**l
+        val = factor * (Y.real if cs == 0 else Y.imag)
 
-    return result
+    return xp.where(nonzero, val, origin_value)
 
 
 def build_A_matrix(
