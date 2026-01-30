@@ -20,14 +20,20 @@ def default_gdma_settings() -> GDMASettings:
 
 
 @pytest.fixture
-def meoh_gdma_sto3g() -> MoleculeGDMARecord:
-    """Generate GDMA data for methanol using STO-3G basis."""
-    gdma_settings = GDMASettings(
+def sto3g_gdma_settings() -> GDMASettings:
+    """STO-3G GDMA settings shared across tests."""
+    return GDMASettings(
         method="scf",
         basis="sto-3g",
         switch=0.0,
-        radius=["C", 0.53, "O", 0.53, "H", 0.53],
+        radius=["C", 0.53, "O", 0.53, "N", 0.53, "H", 0.53, "F", 0.53],
     )
+
+
+@pytest.fixture
+def meoh_gdma_sto3g(sto3g_gdma_settings) -> MoleculeGDMARecord:
+    """Generate GDMA data for methanol using STO-3G basis."""
+    gdma_settings = sto3g_gdma_settings
 
     mol = Molecule.from_mapped_smiles("[C:1]([O:2][H:6])([H:3])([H:4])[H:5]")
 

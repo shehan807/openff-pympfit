@@ -123,7 +123,8 @@ openff_pympfit/_version.py
 
 # dataset files
 spice-gdma.log
-*.npy 
+*.npy
+!openff_pympfit/tests/data/esp/*.npy
 *.pkl 
 *.sqlite 
 *.hdf5
