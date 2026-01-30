@@ -42,18 +42,31 @@ from pympfit import (
     MPFITSVDSolver, generate_mpfit_charge_parameter,
 )
 
+# Create molecule
 molecule = Molecule.from_smiles("CCO")
 molecule.generate_conformers(n_conformers=1)
 [conformer] = extract_conformers(molecule)
 
+# Compute multipoles via Psi4/GDMA
 settings = GDMASettings(method="pbe0", basis="def2-SVP", limit=4)
 coords, multipoles = Psi4GDMAGenerator.generate(
     molecule, conformer, settings, minimize=True
 )
 
+# Fit partial charges to multipoles
 record = MoleculeGDMARecord.from_molecule(molecule, coords, multipoles, settings)
 charges = generate_mpfit_charge_parameter([record], MPFITSVDSolver())
-print(charges.value)
+
+import numpy as np
+
+print(f"MPFIT SMILES         : {charges.smiles}")
+print(f"MPFIT CHARGES        : {np.round(charges.value, 4)}")
+```
+
+Output:
+```
+MPFIT SMILES         : [H:1][O:2][C:3]([H:4])([H:5])[C:6]([H:7])([H:8])[H:9]
+MPFIT CHARGES        : [ 0.34    0.6064 -0.6405 -0.1101 -0.1218 -0.113  -0.1281 -0.1534  0.3205]
 ```
 
 See [`examples/tutorials/quickstart.py`](examples/tutorials/quickstart.py) for more.

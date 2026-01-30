@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath(".."))
 
 # -- Project information -----------------------------------------------------
 
-project = "OpenFF PyMPFIT"
+project = "PyMPFIT"
 copyright = (
     "2026, Shehan M. Parmar. "
     "Project structure based on the "
@@ -143,7 +143,7 @@ html_theme_options = {
     "sidebar_hide_name": True,  # Logo already has the name
 }
 
-html_title = "OpenFF PyMPFIT"
+html_title = "PyMPFIT"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -192,7 +192,7 @@ latex_documents = [
     (
         master_doc,
         "pympfit.tex",
-        "OpenFF PyMPFIT Documentation",
+        "PyMPFIT Documentation",
         "pympfit",
         "manual",
     ),
@@ -203,7 +203,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "pympfit", "OpenFF PyMPFIT Documentation", [author], 1)]
+man_pages = [(master_doc, "pympfit", "PyMPFIT Documentation", [author], 1)]
 
 
 # -- Options for Texinfo output ----------------------------------------------
@@ -215,7 +215,7 @@ texinfo_documents = [
     (
         master_doc,
         "pympfit",
-        "OpenFF PyMPFIT Documentation",
+        "PyMPFIT Documentation",
         author,
         "pympfit",
         "Partial atomic charge assignment via multipole moment-based fitting algorithm",

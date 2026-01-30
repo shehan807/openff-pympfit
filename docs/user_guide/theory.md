@@ -1,6 +1,6 @@
 # Theory
 
-**OpenFF-PyMPFIT** implements the MPFIT algorithm introduced by
+**PyMPFIT** implements the MPFIT algorithm introduced by
 [Ferenczy](https://onlinelibrary.wiley.com/doi/abs/10.1002/jcc.540120802) to
 calculate partial atomic charges that reproduce the electrostatic potential of a
 distributed multipole analysis. This is in contrast with traditional (e.g., RESP)

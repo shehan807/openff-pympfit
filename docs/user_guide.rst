@@ -1,7 +1,7 @@
 User Guide
 ==========
 
-This guide covers the main components and workflows in OpenFF PyMPFIT.
+This guide covers the main components and workflows in PyMPFIT.
 
 GDMA Settings
 -------------
