@@ -6,7 +6,6 @@ Requires Psi4. Run with:
 
 import time
 
-import numpy as np
 from openff.recharge.utilities.molecule import extract_conformers
 from openff.toolkit import Molecule
 from openff.units.elements import SYMBOLS
@@ -22,22 +21,25 @@ from pympfit import (
 # ---------------------------------------------------------------------------
 # 1. QM and GDMA Settings
 # ---------------------------------------------------------------------------
-# GDMASettings controls both the Psi4 QM calculation and the GDMA/MPFIT
+# GDMASettings controls both the Psi4 QM calculation and the GDMA
 # integration parameters.
 
 settings = GDMASettings(
-    method="pbe0",              # DFT functional (or "hf", "mp2", etc.)
-    basis="def2-SVP",           # Basis set for the QM calculation
-    limit=4,                    # Max multipole rank (4 = hexadecapole)
-    switch=4.0,                 # Exponent sum threshold for grid-based DMA
-    radius=[                    # Per-element DMA radii (angstrom)
-        "C", 0.53,
-        "O", 0.53,
-        "H", 0.53,
+    method="pbe0",
+    basis="def2-SVP",
+    limit=4,
+    switch=4.0,
+    radius=[
+        "C",
+        0.53,
+        "O",
+        0.53,
+        "H",
+        0.53,
     ],
-    mpfit_inner_radius=6.78,    # Inner integration radius (bohr)
-    mpfit_outer_radius=12.45,   # Outer integration radius (bohr)
-    mpfit_atom_radius=3.0,      # Atom inclusion radius for per-site fitting (bohr)
+    mpfit_inner_radius=6.78,
+    mpfit_outer_radius=12.45,
+    mpfit_atom_radius=3.0,
 )
 
 print("GDMA Settings:")
