@@ -1,10 +1,6 @@
 import numpy as np
 
-from openff_pympfit.mpfit.core import (
-    _regular_solid_harmonic,
-    build_A_matrix,
-    build_b_vector,
-)
+from pympfit.mpfit.core import _regular_solid_harmonic, build_A_matrix, build_b_vector
 
 
 class TestBuildAMatrix:

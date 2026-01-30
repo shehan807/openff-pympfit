@@ -14,8 +14,8 @@ Installation
 
 .. code-block:: bash
 
-    git clone https://github.com/shehan807/openff-pympfit.git
-    cd openff-pympfit
+    git clone https://github.com/shehan807/pympfit.git
+    cd pympfit
     pip install -e .
 
 **Note:** GDMA functionality requires Psi4 and PyGDMA:
@@ -34,7 +34,7 @@ analysis (GDMA) data computed from quantum chemistry calculations.
 
     from openff.toolkit import Molecule
     from openff.recharge.utilities.molecule import extract_conformers
-    from openff_pympfit import (
+    from pympfit import (
         generate_mpfit_charge_parameter,
         GDMASettings,
         Psi4GDMAGenerator,

@@ -3,7 +3,7 @@
 ================================================================================
 
 This document maps ESP storage tests from openff-recharge to their GDMA
-equivalents in openff-pympfit.
+equivalents in pympfit.
 
 Reference: openff-PyMPFIT-fork/openff/recharge/_tests/esp/test_storage.py
 

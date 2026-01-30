@@ -7,7 +7,7 @@ from typing import TypeVar
 from sqlalchemy import Column, ForeignKey, Integer, PickleType, String, UniqueConstraint
 from sqlalchemy.orm import Query, Session, declarative_base, relationship
 
-from openff_pympfit.gdma import GDMASettings
+from pympfit.gdma import GDMASettings
 
 DBBase = declarative_base()
 

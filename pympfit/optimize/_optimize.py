@@ -9,7 +9,7 @@ from openff.recharge.charges.vsite import (
 from openff.recharge.optimize._optimize import Objective, ObjectiveTerm
 from openff.units import unit
 
-from openff_pympfit.gdma.storage import MoleculeGDMARecord
+from pympfit.gdma.storage import MoleculeGDMARecord
 
 
 class MPFITObjectiveTerm(ObjectiveTerm):
@@ -55,7 +55,7 @@ class MPFITObjective(Objective):
         """
         from openff.toolkit import Molecule
 
-        from openff_pympfit.mpfit.core import (
+        from pympfit.mpfit.core import (
             _convert_flat_to_hierarchical,
             build_A_matrix,
             build_b_vector,

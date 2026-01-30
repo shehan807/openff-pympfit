@@ -62,7 +62,7 @@ class TestPsi4GDMAGenerator:
     ):
         """Test that correct input is generated from the jinja template."""
         pytest.importorskip("psi4")
-        from openff_pympfit.gdma.psi4 import Psi4GDMAGenerator
+        from pympfit.gdma.psi4 import Psi4GDMAGenerator
 
         # Create a closed shell molecule
         molecule = smiles_to_molecule("[Cl-]")
@@ -165,8 +165,8 @@ class TestPsi4GDMAGenerator:
     ):
         """Test that GDMA settings are correctly applied to the template."""
         pytest.importorskip("psi4")
-        from openff_pympfit import GDMASettings
-        from openff_pympfit.gdma.psi4 import Psi4GDMAGenerator
+        from pympfit import GDMASettings
+        from pympfit.gdma.psi4 import Psi4GDMAGenerator
 
         settings = GDMASettings(**gdma_settings_kwargs)
 
@@ -222,8 +222,8 @@ class TestPsi4GDMAGenerator:
     def test_generate(self, minimize, n_threads):
         """Perform a test run of Psi4 GDMA."""
         pytest.importorskip("psi4")
-        from openff_pympfit import GDMASettings
-        from openff_pympfit.gdma.psi4 import Psi4GDMAGenerator
+        from pympfit import GDMASettings
+        from pympfit.gdma.psi4 import Psi4GDMAGenerator
 
         # Define the settings to use
         settings = GDMASettings()
@@ -260,8 +260,8 @@ class TestPsi4GDMAGenerator:
     def test_generate_no_properties(self):
         """Test that multipoles are None when compute_mp=False."""
         pytest.importorskip("psi4")
-        from openff_pympfit import GDMASettings
-        from openff_pympfit.gdma.psi4 import Psi4GDMAGenerator
+        from pympfit import GDMASettings
+        from pympfit.gdma.psi4 import Psi4GDMAGenerator
 
         settings = GDMASettings()
 

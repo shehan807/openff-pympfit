@@ -61,7 +61,7 @@ jobs:
         shell: bash -l {0}
         run: |
           python -c "from openff.toolkit import *"
-          pytest -x -n auto --cov=openff_pympfit openff_pympfit/tests/ --cov-report=xml
+          pytest -x -n auto --cov=pympfit pympfit/tests/ --cov-report=xml
 
       - name: CodeCov
         uses: codecov/codecov-action@v5

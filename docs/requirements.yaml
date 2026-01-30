@@ -1,4 +1,4 @@
-name: openff-pympfit-docs
+name: pympfit-docs
 channels:
   - conda-forge
 dependencies:

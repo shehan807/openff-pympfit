@@ -11,7 +11,7 @@ from openff.units import Quantity, unit
 from openff.units.elements import SYMBOLS
 from openff.utilities import get_data_file_path, temporary_cd
 
-from openff_pympfit.gdma import GDMAGenerator, GDMASettings
+from pympfit.gdma import GDMAGenerator, GDMASettings
 
 if TYPE_CHECKING:
     from openff.toolkit import Molecule
@@ -76,9 +76,7 @@ class Psi4GDMAGenerator(GDMAGenerator):
         ]
 
         # Format the jinja template
-        template_path = get_data_file_path(
-            os.path.join("psi4", "input.dat"), "openff_pympfit"
-        )
+        template_path = get_data_file_path(os.path.join("psi4", "input.dat"), "pympfit")
 
         with open(template_path) as file:
             template = jinja2.Template(file.read())

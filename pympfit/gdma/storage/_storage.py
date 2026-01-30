@@ -12,9 +12,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
-from openff_pympfit._annotations import MP, Coordinates
-from openff_pympfit.gdma import GDMASettings
-from openff_pympfit.gdma.storage.db import (
+from pympfit._annotations import MP, Coordinates
+from pympfit.gdma import GDMASettings
+from pympfit.gdma.storage.db import (
     DB_VERSION,
     DBBase,
     DBConformerRecord,
@@ -24,7 +24,7 @@ from openff_pympfit.gdma.storage.db import (
     DBMoleculeRecord,
     DBSoftwareProvenance,
 )
-from openff_pympfit.gdma.storage.exceptions import IncompatibleDBVersion
+from pympfit.gdma.storage.exceptions import IncompatibleDBVersion
 
 unit.define("AU = [] = au = atomic_unit")
 
