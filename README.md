@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/_static/pympfit_logo.png" alt="OpenFF PyMPFIT" width="400">
+<img src="docs/_static/pympfit_logo.png" alt="PyMPFIT" width="400">
 
 [![GitHub Actions Build Status](https://github.com/shehan807/pympfit/actions/workflows/ci.yaml/badge.svg)](https://github.com/shehan807/pympfit/actions/workflows/ci.yaml)
 [![codecov](https://codecov.io/gh/shehan807/pympfit/branch/main/graph/badge.svg)](https://codecov.io/gh/shehan807/pympfit)
@@ -8,7 +8,7 @@
 
 </div>
 
-OpenFF-PyMPFIT is a free, open-source software for performing partial atomic charge fitting using the Gaussian distributed multipole analysis (GDMA). Features include:
+PyMPFIT is a free, open-source software for performing partial atomic charge fitting using the Gaussian distributed multipole analysis (GDMA). Features include:
 
 * Built on open-source libraries: [OpenFF Recharge](https://github.com/openforcefield/openff-recharge), [OpenFF Toolkit](https://github.com/openforcefield/openff-toolkit), and [NumPy](https://numpy.org/)
 * Direct interface to [Psi4](https://psicode.org/) / [GDMA](https://github.com/psi4/gdma) and from wavefunctions stored within [QCFractal](https://github.com/MolSSI/QCFractal) (i.e., [QCArchive](https://qcarchive.molssi.org/))
