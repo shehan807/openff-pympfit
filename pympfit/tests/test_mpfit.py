@@ -11,12 +11,12 @@ import pytest
 from openff.toolkit import Molecule
 from openff.units import unit
 
-from openff_pympfit.mpfit._mpfit import (
+from pympfit.mpfit._mpfit import (
     _generate_dummy_values,
     generate_mpfit_charge_parameter,
     molecule_to_mpfit_library_charge,
 )
-from openff_pympfit.mpfit.solvers import MPFITSVDSolver
+from pympfit.mpfit.solvers import MPFITSVDSolver
 
 
 @pytest.mark.parametrize(

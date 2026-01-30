@@ -7,9 +7,9 @@ from openff.recharge.utilities.toolkits import molecule_to_tagged_smiles
 from openff.toolkit.utils.exceptions import AtomMappingWarning
 from openff.units import unit
 
-from openff_pympfit.gdma.storage import MoleculeGDMARecord
-from openff_pympfit.mpfit.solvers import MPFITSolver
-from openff_pympfit.optimize import MPFITObjective
+from pympfit.gdma.storage import MoleculeGDMARecord
+from pympfit.mpfit.solvers import MPFITSolver
+from pympfit.optimize import MPFITObjective
 
 if TYPE_CHECKING:
     from openff.toolkit import Molecule
@@ -127,7 +127,7 @@ def generate_mpfit_charge_parameter(
     """
     from openff.toolkit import Molecule
 
-    from openff_pympfit.mpfit.solvers import MPFITSVDSolver
+    from pympfit.mpfit.solvers import MPFITSVDSolver
 
     solver = MPFITSVDSolver() if solver is None else solver
 

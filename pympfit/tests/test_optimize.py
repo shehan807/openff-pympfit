@@ -3,8 +3,8 @@ import pytest
 from openff.toolkit import Molecule
 from openff.units import unit
 
-from openff_pympfit import GDMASettings, MoleculeGDMARecord
-from openff_pympfit.optimize import MPFITObjective, MPFITObjectiveTerm
+from pympfit import GDMASettings, MoleculeGDMARecord
+from pympfit.optimize import MPFITObjective, MPFITObjectiveTerm
 
 
 def _make_gdma_settings(mpfit_atom_radius: float) -> GDMASettings:

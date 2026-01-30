@@ -3,10 +3,10 @@ import pytest
 from openff.recharge.utilities.molecule import smiles_to_molecule
 from openff.units import unit
 
-from openff_pympfit.gdma import GDMASettings
-from openff_pympfit.gdma.storage import MoleculeGDMARecord, MoleculeGDMAStore
-from openff_pympfit.gdma.storage.db import DB_VERSION, DBGDMASettings, DBInformation
-from openff_pympfit.gdma.storage.exceptions import IncompatibleDBVersion
+from pympfit.gdma import GDMASettings
+from pympfit.gdma.storage import MoleculeGDMARecord, MoleculeGDMAStore
+from pympfit.gdma.storage.db import DB_VERSION, DBGDMASettings, DBInformation
+from pympfit.gdma.storage.exceptions import IncompatibleDBVersion
 
 
 class TestMoleculeGDMARecord:

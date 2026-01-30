@@ -9,7 +9,7 @@ if "%SPHINXBUILD%" == "" (
 )
 set SOURCEDIR=.
 set BUILDDIR=_build
-set SPHINXPROJ=openff_pympfit
+set SPHINXPROJ=pympfit
 
 if "%1" == "" goto help
 

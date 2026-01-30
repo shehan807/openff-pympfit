@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from openff_pympfit.mpfit.solvers import MPFITSolverError, MPFITSVDSolver
+from pympfit.mpfit.solvers import MPFITSolverError, MPFITSVDSolver
 
 
 class TestMPFITSVDSolver:
