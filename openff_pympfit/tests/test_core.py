@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from openff_pympfit.mpfit.core import (
     _regular_solid_harmonic,
@@ -45,6 +44,8 @@ class TestBuildBVector:
         assert b.shape == (2,)
         assert np.allclose(b, b_expected)
 
+
+import pytest
 
 
 RSH_EXPECTED = [
@@ -104,9 +105,9 @@ class TestRegularSolidHarmonic:
         RSH_EXPECTED,
         ids=[f"l{l}_m{m}_cs{cs}" for l, m, cs, _ in RSH_EXPECTED],
     )
-    def test_known_values(self, l, m, cs, expected, xp):
+    def test_known_values(self, l, m, cs, expected):
         """Test each (l,m,cs) at (x,y,z) = (1,2,3) against analytical value."""
-        result = float(_regular_solid_harmonic(l, m, cs, 1.0, 2.0, 3.0, xp=xp))
+        result = float(_regular_solid_harmonic(l, m, cs, 1.0, 2.0, 3.0))
         assert np.isclose(result, expected, rtol=1e-12)
 
     @pytest.mark.parametrize(
@@ -114,17 +115,17 @@ class TestRegularSolidHarmonic:
         RSH_EXPECTED,
         ids=[f"l{l}_m{m}_cs{cs}" for l, m, cs, _ in RSH_EXPECTED],
     )
-    def test_vector_matches_scalar(self, l, m, cs, expected, xp):
-
+    def test_vector_matches_scalar(self, l, m, cs, expected):
+        
         np.random.seed(42)
-
+        
         x = np.random.randn(8)
         y = np.random.randn(8)
         z = np.random.randn(8)
 
-        vec_result = _regular_solid_harmonic(l, m, cs, x, y, z, xp=xp)
+        vec_result = _regular_solid_harmonic(l, m, cs, x, y, z)
         scalar_results = np.array([
-            float(_regular_solid_harmonic(l, m, cs, x[i], y[i], z[i], xp=xp))
+            float(_regular_solid_harmonic(l, m, cs, x[i], y[i], z[i]))
             for i in range(len(x))
         ])
         assert np.allclose(vec_result, scalar_results, rtol=1e-12)
@@ -134,8 +135,8 @@ class TestRegularSolidHarmonic:
         RSH_EXPECTED,
         ids=[f"l{l}_m{m}_cs{cs}" for l, m, cs, _ in RSH_EXPECTED],
     )
-    def test_origin(self, l, m, cs, expected, xp):
-        result = float(_regular_solid_harmonic(l, m, cs, 0, 0, 0, xp=xp))
+    def test_origin(self, l, m, cs, expected):
+        result = float(_regular_solid_harmonic(l, m, cs, 0, 0, 0))
         if l == 0:
             assert np.isclose(result, 1.0)
         else:
@@ -146,21 +147,21 @@ class TestRegularSolidHarmonic:
         RSH_EXPECTED,
         ids=[f"l{l}_m{m}_cs{cs}" for l, m, cs, _ in RSH_EXPECTED],
     )
-    def test_near_origin(self, l, m, cs, expected, xp):
+    def test_near_origin(self, l, m, cs, expected):
         eps = 1e-15
-        result = float(_regular_solid_harmonic(l, m, cs, eps, eps, eps, xp=xp))
+        result = float(_regular_solid_harmonic(l, m, cs, eps, eps, eps))
         assert np.isfinite(result)
         if l > 0:
             assert abs(result) < 1e-5
 
-    def test_vector_with_origin_point(self, xp):
-
+    def test_vector_with_origin_point(self):
+        
         x = np.array([0.0, 1.0, 2.0])
         y = np.array([0.0, 0.5, 1.0])
         z = np.array([0.0, 1.5, 0.5])
-
-        result = _regular_solid_harmonic(0, 0, 0, x, y, z, xp=xp)
-
+        
+        result = _regular_solid_harmonic(0, 0, 0, x, y, z)
+        
         assert result.shape == (3,)
         assert np.all(np.isfinite(result))
         assert np.isclose(result[0], 1.0)

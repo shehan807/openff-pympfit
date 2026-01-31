@@ -7,22 +7,6 @@ from openff_pympfit import GDMASettings, MoleculeGDMARecord
 from openff_pympfit.gdma.psi4 import Psi4GDMAGenerator
 
 
-def pytest_configure(config):
-    try:
-        import jax
-        jax.config.update("jax_enable_x64", True)
-    except ImportError:
-        pass
-
-
-@pytest.fixture(params=["numpy", "jax"])
-def xp(request):
-    if request.param == "numpy":
-        return np
-    jax = pytest.importorskip("jax")
-    return jax.numpy
-
-
 @pytest.fixture
 def default_gdma_settings() -> GDMASettings:
     """Default GDMA settings used by test_gdma.py input generation tests."""
