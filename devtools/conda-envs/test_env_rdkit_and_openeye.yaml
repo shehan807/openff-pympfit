@@ -1,4 +1,4 @@
-name: openff-pympfit-test
+name: pympfit-test
 channels:
   - conda-forge
   - openeye

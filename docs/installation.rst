@@ -7,7 +7,7 @@ From pip
 
 .. code-block:: bash
 
-   pip install openff-pympfit
+   pip install pympfit
 
 From source
 -----------
@@ -16,12 +16,12 @@ For development or to get the latest changes:
 
 .. code-block:: bash
 
-   git clone https://github.com/openforcefield/openff-pympfit.git
-   cd openff-pympfit
+   git clone https://github.com/openforcefield/pympfit.git
+   cd pympfit
 
    # Create conda environment with all dependencies
    conda env create -f devtools/conda-envs/test_env_rdkit.yaml
-   conda activate openff-pympfit-test-rdkit
+   conda activate pympfit-test-rdkit
 
    # Install in editable mode
    pip install -e .
