@@ -3,6 +3,8 @@ Constrained MPFIT Implementation
 
 Fits partial charges to reproduce GDMA multipoles with atom-type equivalence constraints.
 Atoms with the same type label are constrained to have equal total charges.
+
+Per-molecule charge conservation is enforced via soft penalty terms weighted by conchg.
 """
 
 from __future__ import annotations
@@ -39,6 +41,10 @@ class ConstrainedMPFITState:
     lmax: np.ndarray | None = None
     rvdw: np.ndarray | None = None
 
+    # Per-molecule tracking for charge conservation
+    atom_counts: list[int] = field(default_factory=list)
+    molecule_charges: list[float] = field(default_factory=list)
+
 
 # --- Setup ---
 
@@ -71,6 +77,7 @@ def setup_from_gdma_records(
     all_multipoles = []
     all_rvdw = []
     all_lmax = []
+    atom_counts = []
     total_atoms = 0
 
     for gdma_record in gdma_records:
@@ -79,6 +86,7 @@ def setup_from_gdma_records(
         )
         n_atoms = molecule.n_atoms
         total_atoms += n_atoms
+        atom_counts.append(n_atoms)
         gdma_settings = gdma_record.gdma_settings
 
         conformer_bohr = unit.convert(gdma_record.conformer, unit.angstrom, unit.bohr)
@@ -111,6 +119,7 @@ def setup_from_gdma_records(
     state.rvdw = np.concatenate(all_rvdw)
     state.lmax = np.concatenate(all_lmax)
 
+    state.atom_counts = atom_counts
     state.quse = build_quse_matrix(state.xyzmult, state.xyzcharge, state.rvdw)
     state.allcharge = np.zeros((total_atoms, total_atoms))
     state.qstore = np.zeros(total_atoms)
@@ -129,11 +138,10 @@ def build_quse_matrix(
 
 
 def count_parameters(state: ConstrainedMPFITState) -> int:
-    """Count free parameters after applying constraints."""
+    """Count free parameters after applying atom-type equivalence constraints."""
     atomtype = state.atomtype
     quse = state.quse
     n_atoms = len(atomtype)
-    n_sites = quse.shape[0]
     n_params = 0
 
     for i in range(n_atoms):
@@ -198,8 +206,12 @@ def expandcharge(p0: np.ndarray, state: ConstrainedMPFITState) -> None:
                 state.qstore[i] = charge_sum
 
 
-def kaisq(p0: np.ndarray, state: ConstrainedMPFITState, xp=np) -> float:
-    """Objective function: sum of squared multipole errors."""
+def kaisq(p0: np.ndarray, state: ConstrainedMPFITState) -> float:
+    """Objective function: Eq. F_optimization summed over sites + charge penalty.
+
+    Computes Σ_a F^a where F^a = Σ_{l,m} (4π/(2l+1)) W_l [Q_lm^a - Σ_i q_i R_lm(r_i)]²
+    plus per-molecule charge conservation: λ Σ_mol (Σ_{i∈mol} q_i - Q_mol)²
+    """
     expandcharge(p0, state)
 
     n_sites = state.xyzmult.shape[0]
@@ -207,7 +219,7 @@ def kaisq(p0: np.ndarray, state: ConstrainedMPFITState, xp=np) -> float:
     sumkai = 0.0
 
     for s in range(n_sites):
-        q0 = xp.asarray(state.allcharge[s, :])
+        q0 = state.allcharge[s, :]
         rmax = state.rvdw[s] + state.r2
         rminn = state.rvdw[s] + state.r1
 
@@ -216,9 +228,9 @@ def kaisq(p0: np.ndarray, state: ConstrainedMPFITState, xp=np) -> float:
         for i in range(lmax_s + 1):
             W[i] = (1.0 / (1.0 - 2.0 * i)) * (rmax ** (1 - 2 * i) - rminn ** (1 - 2 * i))
 
-        dx = xp.asarray(state.xyzcharge[:, 0] - state.xyzmult[s, 0])
-        dy = xp.asarray(state.xyzcharge[:, 1] - state.xyzmult[s, 1])
-        dz = xp.asarray(state.xyzcharge[:, 2] - state.xyzmult[s, 2])
+        dx = state.xyzcharge[:, 0] - state.xyzmult[s, 0]
+        dy = state.xyzcharge[:, 1] - state.xyzmult[s, 1]
+        dz = state.xyzcharge[:, 2] - state.xyzmult[s, 2]
 
         site_sum = 0.0
         for l in range(lmax_s + 1):
@@ -228,18 +240,28 @@ def kaisq(p0: np.ndarray, state: ConstrainedMPFITState, xp=np) -> float:
             for m in range(l + 1):
                 cs_range = [0] if m == 0 else [0, 1]
                 for cs in cs_range:
-                    rsh_vals = _regular_solid_harmonic(l, m, cs, dx, dy, dz, xp=xp)
-                    sum1 = xp.dot(q0, rsh_vals)
-                    site_sum += weight * (state.multipoles[s, l, m, cs] - float(sum1)) ** 2
+                    rsh_vals = _regular_solid_harmonic(l, m, cs, dx, dy, dz)
+                    sum1 = np.dot(q0, rsh_vals)
+                    site_sum += weight * (state.multipoles[s, l, m, cs] - sum1) ** 2
 
         sumkai += site_sum
 
-    sumchg = np.sum(state.qstore)
-    sumcon = state.conchg * (sumchg - state.molecule_charge) ** 2
+    # Per-molecule charge conservation penalties
+    sumcon = 0.0
+    if state.molecule_charges and state.atom_counts:
+        offset = 0
+        for n_i, q_target in zip(state.atom_counts, state.molecule_charges):
+            mol_q = np.sum(state.qstore[offset:offset + n_i])
+            sumcon += state.conchg * (mol_q - q_target) ** 2
+            offset += n_i
+    else:
+        sumchg = np.sum(state.qstore)
+        sumcon = state.conchg * (sumchg - state.molecule_charge) ** 2
+
     return sumkai + sumcon
 
 
-def dkaisq(p0: np.ndarray, state: ConstrainedMPFITState, xp=np) -> np.ndarray:
+def dkaisq(p0: np.ndarray, state: ConstrainedMPFITState) -> np.ndarray:
     """Gradient of kaisq with respect to reduced parameters."""
     expandcharge(p0, state)
 
@@ -249,7 +271,7 @@ def dkaisq(p0: np.ndarray, state: ConstrainedMPFITState, xp=np) -> np.ndarray:
     dparam = np.zeros((n_sites, n_atoms))
 
     for s in range(n_sites):
-        q0 = xp.asarray(state.allcharge[s, :])
+        q0 = state.allcharge[s, :]
         rmax = state.rvdw[s] + state.r2
         rminn = state.rvdw[s] + state.r1
 
@@ -258,9 +280,9 @@ def dkaisq(p0: np.ndarray, state: ConstrainedMPFITState, xp=np) -> np.ndarray:
         for i in range(lmax_s + 1):
             W[i] = (1.0 / (1.0 - 2.0 * i)) * (rmax ** (1 - 2 * i) - rminn ** (1 - 2 * i))
 
-        dx = xp.asarray(state.xyzcharge[:, 0] - state.xyzmult[s, 0])
-        dy = xp.asarray(state.xyzcharge[:, 1] - state.xyzmult[s, 1])
-        dz = xp.asarray(state.xyzcharge[:, 2] - state.xyzmult[s, 2])
+        dx = state.xyzcharge[:, 0] - state.xyzmult[s, 0]
+        dy = state.xyzcharge[:, 1] - state.xyzmult[s, 1]
+        dz = state.xyzcharge[:, 2] - state.xyzmult[s, 2]
 
         for l in range(lmax_s + 1):
             weight = (4.0 * np.pi) if l == 0 else (4.0 * np.pi / (2.0 * l + 1.0))
@@ -269,28 +291,40 @@ def dkaisq(p0: np.ndarray, state: ConstrainedMPFITState, xp=np) -> np.ndarray:
             for m in range(l + 1):
                 cs_range = [0] if m == 0 else [0, 1]
                 for cs in cs_range:
-                    rsh_vals = _regular_solid_harmonic(l, m, cs, dx, dy, dz, xp=xp)
-                    sum1 = xp.dot(q0, rsh_vals)
-                    coeff = 2.0 * weight * (state.multipoles[s, l, m, cs] - float(sum1))
-                    dparam[s, :] -= coeff * np.asarray(rsh_vals)
+                    rsh_vals = _regular_solid_harmonic(l, m, cs, dx, dy, dz)
+                    sum1 = np.dot(q0, rsh_vals)
+                    coeff = 2.0 * weight * (state.multipoles[s, l, m, cs] - sum1)
+                    dparam[s, :] -= coeff * rsh_vals
 
+    # Flatten to atom-major order: dparam1[atom_i * n_sites + site_s]
     dparam1 = dparam.T.flatten()
 
-    sumchg = np.sum(state.qstore)
-    dparam1 += state.conchg * 2.0 * (sumchg - state.molecule_charge)
+    # Per-molecule charge conservation gradient
+    if state.molecule_charges and state.atom_counts:
+        offset = 0
+        for n_i, q_target in zip(state.atom_counts, state.molecule_charges):
+            mol_q = np.sum(state.qstore[offset:offset + n_i])
+            grad_val = state.conchg * 2.0 * (mol_q - q_target)
+            for a in range(offset, offset + n_i):
+                dparam1[a * n_sites:a * n_sites + n_sites] += grad_val
+            offset += n_i
+    else:
+        sumchg = np.sum(state.qstore)
+        dparam1 += state.conchg * 2.0 * (sumchg - state.molecule_charge)
 
     return createdkaisq(dparam1, state)
 
 
 def createdkaisq(dparam1: np.ndarray, state: ConstrainedMPFITState) -> np.ndarray:
-    """Apply chain rule for constraint gradient transformation."""
+    """Transform full-space gradient to reduced parameter space."""
     atomtype = state.atomtype
     quse = state.quse
     n_atoms = len(atomtype)
     n_sites = n_atoms
     dparam1 = dparam1.copy()
 
-    # Pass 1: Propagate constraint dependencies
+    # Pass 1: For each twinned atom, redistribute the constrained (last)
+    # site's gradient to the twin's entries and negatively to the free sites.
     for i in range(1, n_atoms):
         twin = next((k for k in range(i) if atomtype[i] == atomtype[k]), None)
         if twin is not None:
@@ -305,7 +339,7 @@ def createdkaisq(dparam1: np.ndarray, state: ConstrainedMPFITState) -> np.ndarra
                     for k in range(j):
                         dparam1[i * n_sites + k] -= dparam1[i * n_sites + j]
 
-    # Pass 2: Extract free parameters
+    # Pass 2: Extract free-parameter gradient entries
     n_params = count_parameters(state)
     dkaisq_out = np.zeros(n_params)
     count = 0
@@ -340,19 +374,18 @@ def createdkaisq(dparam1: np.ndarray, state: ConstrainedMPFITState) -> np.ndarra
 def optimize_constrained(
     state: ConstrainedMPFITState,
     p0_init: np.ndarray | None = None,
-    xp=np,
 ) -> dict:
-    """Run constrained MPFIT optimization."""
+    """Run constrained MPFIT optimization using L-BFGS-B."""
     n_params = count_parameters(state)
     if p0_init is None:
         p0_init = np.zeros(n_params)
 
     result = minimize(
-        fun=lambda p: kaisq(p, state, xp=xp),
+        fun=lambda p: kaisq(p, state),
         x0=p0_init,
-        jac=lambda p: dkaisq(p, state, xp=xp),
+        jac=lambda p: dkaisq(p, state),
         method="L-BFGS-B",
-        options={"maxiter": 10000, "ftol": 1e-12, "gtol": 1e-10},
+        options={"maxiter": 1000, "ftol": 1e-8, "gtol": 1e-6},
     )
 
     expandcharge(result.x, state)
@@ -365,8 +398,6 @@ def optimize_constrained(
         "scipy_result": result,
     }
 
-
-# --- High-Level API ---
 
 def generate_atom_type_labels_from_symmetry(
     molecule,
@@ -395,13 +426,10 @@ def generate_atom_type_labels_from_symmetry(
 def fit_constrained_mpfit(
     gdma_records: list[MoleculeGDMARecord] | MoleculeGDMARecord,
     atom_type_labels: list[str],
-    molecule_charge: float = 0.0,
-    backend: str = "numpy",
+    molecule_charges: list[float] | float = 0.0,
+    conchg: float = 1.0,
 ) -> dict:
     """Fit constrained MPFIT charges for one or more molecules.
-
-    Atoms with the same type label are constrained to share the same charge,
-    both within a molecule and across multiple molecules.
 
     Parameters
     ----------
@@ -409,32 +437,34 @@ def fit_constrained_mpfit(
         One or more GDMA records.
     atom_type_labels : list[str]
         Atom type labels for all atoms (concatenated across molecules).
-        Length must equal the total number of atoms.
-    molecule_charge : float
-        Total charge constraint.
-    backend : str
-        Array backend: "numpy" or "jax".
+    molecule_charges : list[float] or float
+        Target charge for each molecule. If a single float, applied to every
+        molecule. If a list, must match the number of GDMA records.
+    conchg : float
+        Weight for the charge conservation penalty (default 1.0).
 
     Returns
     -------
-    dict with keys:
-        'qstore': np.ndarray - Fitted charges for all atoms
-        'allcharge': np.ndarray - Per-site charge distributions
-        'objective': float - Final objective function value
-        'success': bool - Whether the optimizer converged
-        'scipy_result': OptimizeResult - Full scipy result
+    dict with keys: qstore, allcharge, objective, success, scipy_result
     """
-    if backend == "jax":
-        import jax
-        jax.config.update("jax_enable_x64", True)
-        import jax.numpy as jnp
-        xp = jnp
-    else:
-        xp = np
+    if not isinstance(gdma_records, list):
+        gdma_records = [gdma_records]
 
     state = setup_from_gdma_records(gdma_records, atom_type_labels)
-    state.molecule_charge = molecule_charge
-    return optimize_constrained(state, xp=xp)
+    state.conchg = conchg
+
+    if isinstance(molecule_charges, (int, float)):
+        state.molecule_charges = [float(molecule_charges)] * len(gdma_records)
+    else:
+        if len(molecule_charges) != len(gdma_records):
+            raise ValueError(
+                f"molecule_charges has {len(molecule_charges)} entries, "
+                f"but there are {len(gdma_records)} GDMA records"
+            )
+        state.molecule_charges = [float(q) for q in molecule_charges]
+
+    state.molecule_charge = sum(state.molecule_charges)
+    return optimize_constrained(state)
 
 
 # --- Test / Main ---
@@ -445,19 +475,7 @@ def test_molecule(
     labels: list[str],
     expected_charge: int = 0,
 ) -> dict:
-    """Test constrained MPFIT on a single molecule.
-
-    Parameters
-    ----------
-    name : str
-        Display name for the molecule.
-    smiles : str
-        SMILES string.
-    labels : list[str]
-        Atom type labels (one per atom). Equivalent atoms share the same label.
-    expected_charge : int
-        Net molecular charge.
-    """
+    """Test constrained MPFIT on a single molecule."""
     import time
     from openff.toolkit import Molecule
     from openff.recharge.utilities.molecule import extract_conformers
@@ -481,17 +499,20 @@ def test_molecule(
 
     print(f"\nSMILES: {smiles}")
     print(f"Atoms: {molecule.n_atoms}, Charge: {molecule.total_charge}")
-    print(f"  [Setup: {timings['molecule_setup']:.2f}s]")
 
     print("\n--- Psi4 GDMA ---")
     gdma_settings = GDMASettings()
 
     t_start = time.time()
-    conformer, multipoles = Psi4GDMAGenerator.generate(molecule, conformer, gdma_settings, minimize=True)
-    gdma_record = MoleculeGDMARecord.from_molecule(molecule, conformer, multipoles, gdma_settings)
+    conformer, multipoles = Psi4GDMAGenerator.generate(
+        molecule, conformer, gdma_settings, minimize=True,
+    )
+    gdma_record = MoleculeGDMARecord.from_molecule(
+        molecule, conformer, multipoles, gdma_settings,
+    )
     timings["psi4_gdma"] = time.time() - t_start
 
-    print(f"  [Psi4: {timings['psi4_gdma']:.2f}s ({timings['psi4_gdma']/60:.2f} min)]")
+    print(f"  [Psi4: {timings['psi4_gdma']:.2f}s]")
 
     print(f"\n--- Atom Types ---")
     print(f"Labels: {labels}")
@@ -502,7 +523,9 @@ def test_molecule(
 
     print("\nEquivalence classes:")
     for label, indices in equiv_classes.items():
-        atoms_str = ", ".join(f"{i}({SYMBOLS[molecule.atoms[i].atomic_number]})" for i in indices)
+        atoms_str = ", ".join(
+            f"{i}({SYMBOLS[molecule.atoms[i].atomic_number]})" for i in indices
+        )
         print(f"  {label}: [{atoms_str}]")
 
     t_start = time.time()
@@ -520,7 +543,7 @@ def test_molecule(
     result = optimize_constrained(state)
     timings["optimization"] = time.time() - t_start
 
-    print(f"  [{timings['optimization']:.2f}s ({timings['optimization']/60:.2f} min)]")
+    print(f"  [{timings['optimization']:.2f}s]")
 
     print("\n--- Final Charges ---")
     for i, (label, q) in enumerate(zip(labels, result["qstore"])):
@@ -543,9 +566,6 @@ def test_molecule(
     print(f"\nTotal charge: {np.sum(result['qstore']):.6f} (expected: {expected_charge})")
 
     timings["total"] = time.time() - t_total_start
-
-    print(f"\n--- Timing ---")
-    print(f"  Psi4: {timings['psi4_gdma']:.1f}s, Opt: {timings['optimization']:.1f}s, Total: {timings['total']:.1f}s")
 
     return {
         "name": name, "n_atoms": molecule.n_atoms, "qstore": result["qstore"],

@@ -181,7 +181,35 @@ $$ (eq:total_charge)
 
 ## Constrained MPFIT
 
-*Coming soon...*
+The unconstrained MPFIT objective $F = \sum_a F^a$ can be augmented with two
+classes of constraints for transferable force field development.
+
+### Atom-Type Equivalence
+
+Atoms sharing the same type label are constrained to have equal total charges.
+For atom $i$ with twin $k$ (the first atom sharing its type), the per-site
+charges $q_i^a$ are parameterized such that the last site absorbs the
+difference:
+
+$$
+q_i^{a_\text{last}} = q_k^{\text{total}} - \sum_{a \neq a_\text{last}} q_i^a
+$$ (eq:twin_constraint)
+
+This reduces the number of free parameters by one per twinned atom while
+exactly enforcing $q_i^{\text{total}} = q_k^{\text{total}}$.
+
+### Per-Molecule Charge Conservation
+
+For multi-molecule fitting, the total charge of each molecule is driven toward
+its target $Q_\text{mol}$ via a penalty term:
+
+$$
+F_{\text{total}} = \sum_a F^a + \sum_{\text{mol}} \lambda \left(\sum_{i \in \text{mol}} q_i - Q_{\text{mol}}\right)^2
+$$ (eq:constrained_objective)
+
+where $\lambda$ (``conchg``) controls the strength of the charge conservation
+penalty. Larger values of $\lambda$ enforce stricter conservation at the cost
+of a slightly worse multipole fit.
 
 ## Virtual Sites
 
