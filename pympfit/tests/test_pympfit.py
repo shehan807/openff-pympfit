@@ -45,8 +45,13 @@ BOHR_TO_ANGSTROM = unit.convert(1.0, unit.bohr, unit.angstrom)
     ],
 )
 def test_pympfit(
-    molecule_name, smiles, gdma_record_exists, sto3g_gdma_settings,
-    record_class, generator, solver,
+    molecule_name,
+    smiles,
+    gdma_record_exists,
+    sto3g_gdma_settings,
+    record_class,
+    generator,
+    solver,
 ):
     """Test that multipole method and fitting reproduces QM ESP."""
 
@@ -66,9 +71,9 @@ def test_pympfit(
         gdma_db_path = GDMA_DIR / "ionic_liquids.sqlite"
         store = MoleculeGDMAStore(str(gdma_db_path))
         records = store.retrieve(smiles=smiles)
-        assert len(records) > 0, (
-            f"No GDMA records found for {molecule_name} in {gdma_db_path.name}"
-        )
+        assert (
+            len(records) > 0
+        ), f"No GDMA records found for {molecule_name} in {gdma_db_path.name}"
         record = records[0]
         gdma_conformer = record.conformer_quantity
         multipoles = record.multipoles_quantity
