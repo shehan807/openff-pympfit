@@ -1,4 +1,4 @@
-name: openff-pympfit-test-rdkit
+name: pympfit-test-rdkit
 channels:
   - conda-forge
 dependencies:

@@ -4,13 +4,13 @@ import numpy as np
 from openff.recharge.utilities.molecule import extract_conformers
 from openff.toolkit.topology import Molecule
 
-from openff_pympfit.gdma import GDMASettings
-from openff_pympfit.gdma.psi4 import Psi4GDMAGenerator
-from openff_pympfit.gdma.storage import MoleculeGDMARecord
+from pympfit.gdma import GDMASettings
+from pympfit.gdma.psi4 import Psi4GDMAGenerator
+from pympfit.gdma.storage import MoleculeGDMARecord
 
-# From openff-pympfit
-from openff_pympfit.mpfit import generate_mpfit_charge_parameter
-from openff_pympfit.mpfit.solvers import MPFITSVDSolver
+# From pympfit
+from pympfit.mpfit import generate_mpfit_charge_parameter
+from pympfit.mpfit.solvers import MPFITSVDSolver
 
 
 def main():
