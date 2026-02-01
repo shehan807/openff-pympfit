@@ -126,7 +126,8 @@ spice-gdma.log
 *.npy
 !pympfit/tests/data/esp/*.npy
 *.pkl 
-*.sqlite 
+*.sqlite
+!pympfit/tests/data/gdma/*.sqlite
 *.hdf5
 *.h5py
 
