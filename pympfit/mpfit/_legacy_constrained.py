@@ -1,8 +1,9 @@
 """
-Constrained MPFIT Implementation
+Constrained MPFIT implementation.
 
-Fits partial charges to reproduce GDMA multipoles with atom-type equivalence constraints.
-Atoms with the same type label are constrained to have equal total charges.
+Fits partial charges to reproduce GDMA multipoles with atom-type
+equivalence constraints. Atoms with the same type label are constrained
+to have equal total charges.
 
 Per-molecule charge conservation is enforced via soft penalty terms weighted by conchg.
 """
@@ -11,6 +12,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from openff.toolkit import Molecule
 
 import numpy as np
 from openff_pympfit.mpfit.core import _regular_solid_harmonic
@@ -411,7 +415,7 @@ def optimize_constrained(
 
 
 def generate_atom_type_labels_from_symmetry(
-    molecule,
+    molecule: Molecule,
     equivalize_hydrogens: bool = True,
     equivalize_other_atoms: bool = True,
 ) -> list[str]:
@@ -468,7 +472,7 @@ def fit_constrained_mpfit(
     state = setup_from_gdma_records(gdma_records, atom_type_labels)
     state.conchg = conchg
 
-    if isinstance(molecule_charges, (int, float)):
+    if isinstance(molecule_charges, int | float):
         state.molecule_charges = [float(molecule_charges)] * len(gdma_records)
     else:
         if len(molecule_charges) != len(gdma_records):
@@ -571,7 +575,8 @@ def test_molecule(
     print("\n--- Final Charges ---")
     for i, (label, q) in enumerate(zip(labels, result["qstore"], strict=False)):
         print(
-            f"  {i:2d} ({SYMBOLS[molecule.atoms[i].atomic_number]:2s}, {label}): {q:+.6f}"
+            f"  {i:2d} ({SYMBOLS[molecule.atoms[i].atomic_number]:2s},"
+            f" {label}): {q:+.6f}"
         )
 
     all_satisfied = True
@@ -588,7 +593,8 @@ def test_molecule(
     print("\n--- Constraints ---")
     for label, info in constraint_results.items():
         print(
-            f"  {label}: {info['max_diff']:.2e} [{'PASS' if info['satisfied'] else 'FAIL'}]"
+            f"  {label}: {info['max_diff']:.2e}"
+            f" [{'PASS' if info['satisfied'] else 'FAIL'}]"
         )
     print(
         f"\nTotal charge: {np.sum(result['qstore']):.6f} (expected: {expected_charge})"
@@ -607,7 +613,7 @@ def test_molecule(
     }
 
 
-def main():
+def main() -> None:
     """Test constrained MPFIT on ethanol."""
     from openff.toolkit import Molecule
 

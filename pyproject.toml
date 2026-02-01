@@ -143,8 +143,9 @@ docstring-code-format = true
 "devtools/*" = ["ANN", "B904", "D", "E501", "INP001", "T201", "S602"]
 # Examples: demonstration scripts with intentional print
 "examples/*" = ["ANN", "D", "INP001", "T201"]
-# Legacy file: l is physics convention for angular momentum, print is intentional
+# Legacy files: l is physics convention for angular momentum, W is standard notation, print is intentional
 "pympfit/mpfit/_legacy.py" = ["E741", "T201"]
+"pympfit/mpfit/_legacy_constrained.py" = ["E741", "N806", "T201"]
 # Core math: l/m are quantum numbers, A/Y/W are standard physics notation
 "pympfit/mpfit/core.py" = ["E741", "N802", "N803", "N806"]
 # Solvers: U/S/Vh are SVD notation, TRY301 raises in try are intentional
