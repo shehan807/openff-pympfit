@@ -13,9 +13,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
-from scipy.optimize import minimize
-
 from openff_pympfit.mpfit.core import _regular_solid_harmonic
+from scipy.optimize import minimize
 
 if TYPE_CHECKING:
     from openff_pympfit.gdma.storage import MoleculeGDMARecord
@@ -47,6 +46,7 @@ class ConstrainedMPFITState:
 
 
 # --- Setup ---
+
 
 def setup_from_gdma_records(
     gdma_records: list[MoleculeGDMARecord] | MoleculeGDMARecord,
@@ -134,6 +134,7 @@ def build_quse_matrix(
 ) -> np.ndarray:
     """Build binary mask: quse[s,i]=1 if atom i affects site s."""
     from scipy.spatial.distance import cdist
+
     return (cdist(xyzmult, xyzcharge) < rvdw[:, None]).astype(int)
 
 
@@ -160,6 +161,7 @@ def count_parameters(state: ConstrainedMPFITState) -> int:
 
 
 # --- Core Algorithm ---
+
 
 def expandcharge(p0: np.ndarray, state: ConstrainedMPFITState) -> None:
     """Map reduced parameters to full charges with atom-type constraints."""
@@ -226,7 +228,9 @@ def kaisq(p0: np.ndarray, state: ConstrainedMPFITState) -> float:
         lmax_s = int(state.lmax[s])
         W = np.zeros(maxl + 1)
         for i in range(lmax_s + 1):
-            W[i] = (1.0 / (1.0 - 2.0 * i)) * (rmax ** (1 - 2 * i) - rminn ** (1 - 2 * i))
+            W[i] = (1.0 / (1.0 - 2.0 * i)) * (
+                rmax ** (1 - 2 * i) - rminn ** (1 - 2 * i)
+            )
 
         dx = state.xyzcharge[:, 0] - state.xyzmult[s, 0]
         dy = state.xyzcharge[:, 1] - state.xyzmult[s, 1]
@@ -250,8 +254,10 @@ def kaisq(p0: np.ndarray, state: ConstrainedMPFITState) -> float:
     sumcon = 0.0
     if state.molecule_charges and state.atom_counts:
         offset = 0
-        for n_i, q_target in zip(state.atom_counts, state.molecule_charges):
-            mol_q = np.sum(state.qstore[offset:offset + n_i])
+        for n_i, q_target in zip(
+            state.atom_counts, state.molecule_charges, strict=False
+        ):
+            mol_q = np.sum(state.qstore[offset : offset + n_i])
             sumcon += state.conchg * (mol_q - q_target) ** 2
             offset += n_i
     else:
@@ -278,7 +284,9 @@ def dkaisq(p0: np.ndarray, state: ConstrainedMPFITState) -> np.ndarray:
         lmax_s = int(state.lmax[s])
         W = np.zeros(maxl + 1)
         for i in range(lmax_s + 1):
-            W[i] = (1.0 / (1.0 - 2.0 * i)) * (rmax ** (1 - 2 * i) - rminn ** (1 - 2 * i))
+            W[i] = (1.0 / (1.0 - 2.0 * i)) * (
+                rmax ** (1 - 2 * i) - rminn ** (1 - 2 * i)
+            )
 
         dx = state.xyzcharge[:, 0] - state.xyzmult[s, 0]
         dy = state.xyzcharge[:, 1] - state.xyzmult[s, 1]
@@ -302,11 +310,13 @@ def dkaisq(p0: np.ndarray, state: ConstrainedMPFITState) -> np.ndarray:
     # Per-molecule charge conservation gradient
     if state.molecule_charges and state.atom_counts:
         offset = 0
-        for n_i, q_target in zip(state.atom_counts, state.molecule_charges):
-            mol_q = np.sum(state.qstore[offset:offset + n_i])
+        for n_i, q_target in zip(
+            state.atom_counts, state.molecule_charges, strict=False
+        ):
+            mol_q = np.sum(state.qstore[offset : offset + n_i])
             grad_val = state.conchg * 2.0 * (mol_q - q_target)
             for a in range(offset, offset + n_i):
-                dparam1[a * n_sites:a * n_sites + n_sites] += grad_val
+                dparam1[a * n_sites : a * n_sites + n_sites] += grad_val
             offset += n_i
     else:
         sumchg = np.sum(state.qstore)
@@ -371,6 +381,7 @@ def createdkaisq(dparam1: np.ndarray, state: ConstrainedMPFITState) -> np.ndarra
 
 # --- Optimization ---
 
+
 def optimize_constrained(
     state: ConstrainedMPFITState,
     p0_init: np.ndarray | None = None,
@@ -411,11 +422,15 @@ def generate_atom_type_labels_from_symmetry(
     symmetry_groups = get_atom_symmetries(molecule)
     labels = []
 
-    for i, (atom, group) in enumerate(zip(molecule.atoms, symmetry_groups)):
+    for i, (atom, group) in enumerate(
+        zip(molecule.atoms, symmetry_groups, strict=False)
+    ):
         element = SYMBOLS[atom.atomic_number]
         is_hydrogen = atom.atomic_number == 1
 
-        if (is_hydrogen and equivalize_hydrogens) or (not is_hydrogen and equivalize_other_atoms):
+        if (is_hydrogen and equivalize_hydrogens) or (
+            not is_hydrogen and equivalize_other_atoms
+        ):
             labels.append(f"{element}{group}")
         else:
             labels.append(f"{element}_{i}")
@@ -469,6 +484,7 @@ def fit_constrained_mpfit(
 
 # --- Test / Main ---
 
+
 def test_molecule(
     name: str,
     smiles: str,
@@ -477,8 +493,9 @@ def test_molecule(
 ) -> dict:
     """Test constrained MPFIT on a single molecule."""
     import time
-    from openff.toolkit import Molecule
+
     from openff.recharge.utilities.molecule import extract_conformers
+    from openff.toolkit import Molecule
     from openff.units.elements import SYMBOLS
     from openff_pympfit.gdma import GDMASettings
     from openff_pympfit.gdma.psi4 import Psi4GDMAGenerator
@@ -505,16 +522,22 @@ def test_molecule(
 
     t_start = time.time()
     conformer, multipoles = Psi4GDMAGenerator.generate(
-        molecule, conformer, gdma_settings, minimize=True,
+        molecule,
+        conformer,
+        gdma_settings,
+        minimize=True,
     )
     gdma_record = MoleculeGDMARecord.from_molecule(
-        molecule, conformer, multipoles, gdma_settings,
+        molecule,
+        conformer,
+        multipoles,
+        gdma_settings,
     )
     timings["psi4_gdma"] = time.time() - t_start
 
     print(f"  [Psi4: {timings['psi4_gdma']:.2f}s]")
 
-    print(f"\n--- Atom Types ---")
+    print("\n--- Atom Types ---")
     print(f"Labels: {labels}")
 
     equiv_classes = {}
@@ -535,7 +558,7 @@ def test_molecule(
     n_reduced = count_parameters(state)
     timings["mpfit_setup"] = time.time() - t_start
 
-    print(f"\n--- Setup ---")
+    print("\n--- Setup ---")
     print(f"Params: {n_reduced}/{n_full} (saved {n_full - n_reduced})")
 
     print("\n--- Optimization ---")
@@ -546,8 +569,10 @@ def test_molecule(
     print(f"  [{timings['optimization']:.2f}s]")
 
     print("\n--- Final Charges ---")
-    for i, (label, q) in enumerate(zip(labels, result["qstore"])):
-        print(f"  {i:2d} ({SYMBOLS[molecule.atoms[i].atomic_number]:2s}, {label}): {q:+.6f}")
+    for i, (label, q) in enumerate(zip(labels, result["qstore"], strict=False)):
+        print(
+            f"  {i:2d} ({SYMBOLS[molecule.atoms[i].atomic_number]:2s}, {label}): {q:+.6f}"
+        )
 
     all_satisfied = True
     constraint_results = {}
@@ -562,15 +587,23 @@ def test_molecule(
 
     print("\n--- Constraints ---")
     for label, info in constraint_results.items():
-        print(f"  {label}: {info['max_diff']:.2e} [{'PASS' if info['satisfied'] else 'FAIL'}]")
-    print(f"\nTotal charge: {np.sum(result['qstore']):.6f} (expected: {expected_charge})")
+        print(
+            f"  {label}: {info['max_diff']:.2e} [{'PASS' if info['satisfied'] else 'FAIL'}]"
+        )
+    print(
+        f"\nTotal charge: {np.sum(result['qstore']):.6f} (expected: {expected_charge})"
+    )
 
     timings["total"] = time.time() - t_total_start
 
     return {
-        "name": name, "n_atoms": molecule.n_atoms, "qstore": result["qstore"],
-        "labels": labels, "all_satisfied": all_satisfied,
-        "total_charge": np.sum(result["qstore"]), "timings": timings,
+        "name": name,
+        "n_atoms": molecule.n_atoms,
+        "qstore": result["qstore"],
+        "labels": labels,
+        "all_satisfied": all_satisfied,
+        "total_charge": np.sum(result["qstore"]),
+        "timings": timings,
     }
 
 

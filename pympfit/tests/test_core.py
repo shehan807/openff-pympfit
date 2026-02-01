@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from pympfit.mpfit.core import _regular_solid_harmonic, build_A_matrix, build_b_vector
 
@@ -41,16 +42,13 @@ class TestBuildBVector:
         assert np.allclose(b, b_expected)
 
 
-import pytest
-
-
 RSH_EXPECTED = [
     (0, 0, 0, 1.0),
     # l=1: R_10 = z, R_11c = x, R_11s = y
     (1, 0, 0, 3.0),
     (1, 1, 0, 1.0),
     (1, 1, 1, 2.0),
-    # l=2: 
+    # l=2:
     #       R_20  = (3z^2-r^2)/2, R_21c = sqrt(3)*xz, R_21s = sqrt(3)*yz,
     #       R_22c = sqrt(3)/2*(x^2-y^2), R_22s = sqrt(3)*xy
     (2, 0, 0, 6.5),
@@ -58,7 +56,7 @@ RSH_EXPECTED = [
     (2, 1, 1, 10.392304845413264),
     (2, 2, 0, -2.598076211353316),
     (2, 2, 1, 3.464101615137754),
-    # l=3: 
+    # l=3:
     #       R_30  = z(2z^2-3x^2-3y^2)/2,
     #       R_31c = sqrt(6)/4 * x(4z^2-x^2-y^2),
     #       R_31s = sqrt(6)/4 * y(4z^2-x^2-y^2),
@@ -94,6 +92,7 @@ RSH_EXPECTED = [
     (4, 4, 1, -4.437059837324712),
 ]
 
+
 class TestRegularSolidHarmonic:
 
     @pytest.mark.parametrize(
@@ -112,18 +111,20 @@ class TestRegularSolidHarmonic:
         ids=[f"l{l}_m{m}_cs{cs}" for l, m, cs, _ in RSH_EXPECTED],
     )
     def test_vector_matches_scalar(self, l, m, cs, expected):
-        
-        np.random.seed(42)
-        
-        x = np.random.randn(8)
-        y = np.random.randn(8)
-        z = np.random.randn(8)
+
+        rng = np.random.default_rng(42)
+
+        x = rng.standard_normal(8)
+        y = rng.standard_normal(8)
+        z = rng.standard_normal(8)
 
         vec_result = _regular_solid_harmonic(l, m, cs, x, y, z)
-        scalar_results = np.array([
-            float(_regular_solid_harmonic(l, m, cs, x[i], y[i], z[i]))
-            for i in range(len(x))
-        ])
+        scalar_results = np.array(
+            [
+                float(_regular_solid_harmonic(l, m, cs, x[i], y[i], z[i]))
+                for i in range(len(x))
+            ]
+        )
         assert np.allclose(vec_result, scalar_results, rtol=1e-12)
 
     @pytest.mark.parametrize(
@@ -151,13 +152,13 @@ class TestRegularSolidHarmonic:
             assert abs(result) < 1e-5
 
     def test_vector_with_origin_point(self):
-        
+
         x = np.array([0.0, 1.0, 2.0])
         y = np.array([0.0, 0.5, 1.0])
         z = np.array([0.0, 1.5, 0.5])
-        
+
         result = _regular_solid_harmonic(0, 0, 0, x, y, z)
-        
+
         assert result.shape == (3,)
         assert np.all(np.isfinite(result))
         assert np.isclose(result[0], 1.0)
