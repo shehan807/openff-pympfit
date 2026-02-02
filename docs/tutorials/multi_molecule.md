@@ -134,10 +134,10 @@ parameters = generate_constrained_mpfit_charge_parameter(
 )
 ```
 
-```{dropdown} MMIM charges
+````{dropdown} MMIM charges
 :open:
 
-\`\`\`text
+```text
 C 1 (  C1): +0.6183
 N 2 (  N1): +0.0871
 C 3 (  C2): +0.0216
@@ -155,12 +155,12 @@ H14 (  H5): +0.0605
 H15 (  H5): +0.0605
 H16 (  H5): +0.0605
 Total: +1.0000
-\`\`\`
 ```
+````
 
-```{dropdown} EMIM charges
+````{dropdown} EMIM charges
 
-\`\`\`text
+```text
 C 1 (  C6): +0.0181
 C 2 (  C7): +0.1877
 N 3 (  N3): +0.1253
@@ -181,12 +181,12 @@ H17 (  H5): +0.0605
 H18 (  H5): +0.0605
 H19 (  H5): +0.0605
 Total: +1.0000
-\`\`\`
 ```
+````
 
-```{dropdown} BMIM charges
+````{dropdown} BMIM charges
 
-\`\`\`text
+```text
 C 1 ( C10): +0.1110
 C 2 ( C11): +0.0932
 C 3 ( C12): +0.1596
@@ -213,12 +213,12 @@ H23 (  H5): +0.0605
 H24 (  H5): +0.0605
 H25 (  H5): +0.0605
 Total: +1.0000
-\`\`\`
 ```
+````
 
-```{dropdown} C6MIM charges
+````{dropdown} C6MIM charges
 
-\`\`\`text
+```text
 C 1 ( C10): +0.1110
 C 2 ( C11): +0.0932
 C 3 ( C14): +0.5221
@@ -251,8 +251,8 @@ H29 (  H5): +0.0605
 H30 (  H5): +0.0605
 H31 (  H5): +0.0605
 Total: +1.0000
-\`\`\`
 ```
+````
 
 Each molecule's total charge is +1.0, enforced by the conservation
 penalty. Shared atom types carry identical charges across molecules —
