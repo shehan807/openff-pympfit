@@ -187,8 +187,6 @@ equivalence and per-molecule charge conservation. When fitting across multiple
 molecules simultaneously, these constraints enable transferable charge sets
 where chemically equivalent atoms in different molecules carry identical charges.
 
-### Parameterization
-
 In the constrained formulation, each atom $i$ contributes a charge $q_i^a$ at
 each multipole site $a$ for which it is within the cutoff radius (the ``quse``
 mask). The total charge on atom $i$ is
@@ -220,7 +218,7 @@ the last contributing site $a^*$ (in index order), which absorbs the
 difference needed to match the reference total:
 
 $$
-q_i^{a^*} = q^{\text{total}}_{\mathcal{T}} - \sum_{a \neq a^*} q_i^a
+q_i^{a^_} = q^{\text{total}}_{\mathcal{T}} - \sum_{a \neq a^_} q_i^a
 $$ (eq:twin_constraint)
 
 The per-site charge distributions may differ between atoms in
@@ -246,8 +244,6 @@ The parameter $\lambda$ (``conchg``) controls the strength of the charge
 conservation penalty. Larger values of $\lambda$ enforce stricter conservation
 at the cost of a slightly worse multipole fit. $Q_{\text{mol}}$ is the target
 total charge for each molecule (e.g., +1 for a cation, 0 for a neutral).
-
-### Jacobian
 
 The gradient of $F_{\text{total}}$ with respect to the full per-site charges
 has two contributions. The multipole fitting gradient
