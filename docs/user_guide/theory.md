@@ -104,7 +104,7 @@ $$ (eq:regular_harmonic)
 This allows for simplification of the original equation to,
 
 $$
-f(r) = \sum_a\sum_{l,m}I_{lm}^a(r)[Q_{lm}^a - \sum_{i}q_{i}^{a}R_{lm}^{a}(r_i)] = \sum_{a}f^{a}(r)
+f(r) = \sum_a\sum_{l,m}I_{lm}^a[r](Q_{lm}^a - \sum_{i}q_{i}^{a}R_{lm}^{a}(r_i)) = \sum_{a}f^{a}(r)
 $$ (eq:simplified_potential)
 
 We can eliminate $I_{lm}^{a}(r)$ by integration. Namely, the integration of
@@ -190,7 +190,7 @@ where chemically equivalent atoms in different molecules carry identical charges
 ### Parameterization
 
 In the constrained formulation, each atom $i$ contributes a charge $q_i^a$ at
-each multipole site $a$ for which it is within the cutoff radius (the "quse"
+each multipole site $a$ for which it is within the cutoff radius (the ``quse``
 mask). The total charge on atom $i$ is
 
 $$
@@ -202,19 +202,32 @@ vector $\mathbf{p}$ that implicitly enforces atom-type equivalence.
 
 ### Atom-Type Equivalence
 
-Atoms sharing the same type label are constrained to have equal total charges.
-For atom $i$ with twin $k$ (the first atom sharing its type), the per-site
-charges $q_i^a$ are parameterized such that the last contributing site absorbs
-the difference:
+Atoms sharing the same type label are constrained to have equal total
+charges. Let $\mathcal{T}$ be a set of atoms sharing the same type, and
+let $i_1$ be the first atom in $\mathcal{T}$ (processed first by the
+optimizer). Each site $a$ where $\text{quse}_{a,i_1} = 1$ receives a
+free parameter from $\mathbf{p}$, defining the reference total charge
+for the type:
 
 $$
-q_i^{a_\text{last}} = q_k^{\text{total}} - \sum_{a \neq a_\text{last}} q_i^a
+q^{\text{total}}_{\mathcal{T}} = \sum_{\substack{a \\ \text{quse}_{a,i_1}=1}} q_{i_1}^a
+$$ (eq:type_reference_charge)
+
+For every subsequent atom $i \in \mathcal{T}$ ($i \neq i_1$), each
+contributing site also receives a free parameter except the last site
+$a^*$ (the final $a$ for which $\text{quse}_{a,i} = 1$ in iteration
+order), which absorbs the difference:
+
+$$
+q_i^{a^*} = q^{\text{total}}_{\mathcal{T}} - \sum_{\substack{a \neq a^* \\ \text{quse}_{a,i}=1}} q_i^a
 $$ (eq:twin_constraint)
 
-This reduces the number of free parameters by one per twinned atom while
-exactly enforcing $q_i^{\text{total}} = q_k^{\text{total}}$. The mapping from
-the reduced parameter vector $\mathbf{p}$ to the full per-site charge matrix
-and total charges is performed by ``expandcharge``.
+If atom $i$ contributes to only one site, no free parameters are consumed
+and $q^{\text{total}}_{\mathcal{T}}$ is copied directly. This reduces
+the number of free parameters by one per subsequent atom in $\mathcal{T}$
+while exactly enforcing equal total charges across the type. The mapping
+from $\mathbf{p}$ to the full per-site charge matrix and total charges
+is performed by ``expandcharge``.
 
 ### Constrained Objective Function
 
