@@ -9,6 +9,7 @@ from pympfit.gdma.psi4 import Psi4GDMAGenerator
 from pympfit.gdma.storage import MoleculeGDMARecord, MoleculeGDMAStore
 from pympfit.mpfit import (
     generate_constrained_mpfit_charge_parameter,
+    generate_global_atom_type_labels,
     generate_mpfit_charge_parameter,
 )
 from pympfit.mpfit.solvers import (
@@ -52,7 +53,7 @@ BOHR_TO_ANGSTROM = unit.convert(1.0, unit.bohr, unit.angstrom)
         ("p4444", "CCCC[P+](CCCC)(CCCC)CCCC", True),
     ],
 )
-def test_pympfit(
+def test_pympfit_single(
     molecule_name,
     smiles,
     gdma_record_exists,
@@ -128,3 +129,78 @@ def test_pympfit(
         np.sum(charges), formal_charge, atol=0.05
     ), f"sum(charges) = {np.sum(charges):.4f}, expected {formal_charge}"
     assert rmse < 1e-2, f"RMSE = {rmse:.6e} exceeds 1e-2 tolerance"
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "solver",
+    [ConstrainedSciPySolver()],
+)
+@pytest.mark.parametrize(
+    "molecule_names, smiles_list",
+    [
+        (
+            ["mmim", "emim"],
+            ["CN1C=C[N+](=C1)C", "CCN1C=C[N+](=C1)C"],
+        ),
+        (
+            ["mmim", "emim", "bmim"],
+            ["CN1C=C[N+](=C1)C", "CCN1C=C[N+](=C1)C", "CCCCN1C=C[N+](=C1)C"],
+        ),
+    ],
+)
+def test_pympfit_multi(molecule_names, smiles_list, solver):
+    """Test constrained fitting across multiple molecules with shared charges."""
+    store = MoleculeGDMAStore(str(GDMA_DIR / "ionic_liquids.sqlite"))
+
+    molecules, records = [], []
+    for smi in smiles_list:
+        molecules.append(Molecule.from_smiles(smi, allow_undefined_stereo=True))
+        recs = store.retrieve(smiles=smi)
+        assert len(recs) > 0, f"No GDMA records for {smi}"
+        records.append(recs[0])
+
+    parameters = generate_constrained_mpfit_charge_parameter(
+        records,
+        molecules,
+        solver=solver,
+    )
+    assert len(parameters) == len(molecules)
+
+    # Per-molecule: charge conservation and ESP accuracy
+    for i, (mol, param, name) in enumerate(
+        zip(molecules, parameters, molecule_names, strict=False)
+    ):
+        charges = np.array(param.value)
+        formal_q = mol.total_charge.m_as(unit.elementary_charge)
+        assert len(charges) == mol.n_atoms
+        assert np.isclose(
+            np.sum(charges), formal_q, atol=0.05
+        ), f"{name}: sum(charges)={np.sum(charges):.4f}, expected {formal_q}"
+
+        grid = np.load(DATA_DIR / f"{name}_grid.npy")
+        ref_esp = np.load(DATA_DIR / f"{name}_esp.npy").flatten()
+        coord = records[i].conformer_quantity.m_as(unit.angstrom)
+        diff = grid[:, np.newaxis, :] - coord[np.newaxis, :, :]
+        distances = np.linalg.norm(diff, axis=2)
+        calc_esp = np.sum(charges[np.newaxis, :] / distances, axis=1) * BOHR_TO_ANGSTROM
+        rmse = np.sqrt(np.mean((ref_esp - calc_esp) ** 2))
+        # Multi-molecule fits sacrifice some per-molecule ESP accuracy for
+        # cross-molecule charge transferability, but should be similar magnitude.
+        assert rmse < 5e-2, f"{name}: RMSE={rmse:.6e} exceeds 5e-2"
+
+    # Cross-molecule: atoms sharing a label must have equal charges
+    labels = generate_global_atom_type_labels(molecules)
+    flat_labels = [lbl for mol_labels in labels for lbl in mol_labels]
+    flat_charges = np.concatenate([np.array(p.value) for p in parameters])
+
+    from collections import defaultdict
+
+    label_to_charges = defaultdict(list)
+    for lbl, q in zip(flat_labels, flat_charges, strict=False):
+        label_to_charges[lbl].append(q)
+    for lbl, qs in label_to_charges.items():
+        if len(qs) > 1:
+            assert np.allclose(
+                qs, qs[0], atol=1e-4
+            ), f"label {lbl}: charges {qs} not equal"
