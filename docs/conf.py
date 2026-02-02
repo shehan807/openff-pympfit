@@ -66,6 +66,7 @@ napoleon_use_ivar = True
 myst_enable_extensions = [
     "dollarmath",
     "amsmath",
+    "colon_fence",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
