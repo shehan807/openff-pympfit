@@ -26,7 +26,10 @@ molecule.generate_conformers(n_conformers=1)
 [conformer] = extract_conformers(molecule)
 settings = GDMASettings()
 coords, multipoles = Psi4GDMAGenerator.generate(
-    molecule, conformer, settings, minimize=True,
+    molecule,
+    conformer,
+    settings,
+    minimize=True,
 )
 record = MoleculeGDMARecord.from_molecule(molecule, coords, multipoles, settings)
 
@@ -47,7 +50,9 @@ print()
 # constrained fit ---
 solver = ConstrainedSciPySolver(conchg=10.0)
 [parameter] = generate_constrained_mpfit_charge_parameter(
-    [record], [molecule], solver=solver,
+    [record],
+    [molecule],
+    solver=solver,
 )
 
 print("Fitted charges:")
