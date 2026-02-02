@@ -265,5 +265,159 @@ class TestPsi4MBISGenerator:
         assert mp is None
 
 
+class TestMultipoleTransform:
+    """Test Cartesian to spherical harmonic multipole transformations."""
+
+    def test_cartesian_to_spherical_dipole(self):
+        """Test dipole transformation: Cartesian (x,y,z) -> Spherical (Q10,Q11c,Q11s)."""
+        from openff_pympfit.mbis.multipole_transform import (
+            cartesian_to_spherical_dipole,
+        )
+
+        # Test case: single atom with known dipole
+        # Cartesian: [x, y, z] = [1.0, 2.0, 3.0]
+        # Expected spherical: [Q10, Q11c, Q11s] = [z, x, y] = [3.0, 1.0, 2.0]
+        mu_cart = np.array([[1.0, 2.0, 3.0]])
+        mu_sph = cartesian_to_spherical_dipole(mu_cart)
+
+        expected = np.array([[3.0, 1.0, 2.0]])
+        np.testing.assert_allclose(mu_sph, expected, rtol=1e-10)
+
+    def test_cartesian_to_spherical_dipole_multi_atom(self):
+        """Test dipole transformation for multiple atoms."""
+        from openff_pympfit.mbis.multipole_transform import (
+            cartesian_to_spherical_dipole,
+        )
+
+        mu_cart = np.array(
+            [
+                [1.0, 0.0, 0.0],  # x-only dipole
+                [0.0, 1.0, 0.0],  # y-only dipole
+                [0.0, 0.0, 1.0],  # z-only dipole
+            ]
+        )
+        mu_sph = cartesian_to_spherical_dipole(mu_cart)
+
+        # [Q10, Q11c, Q11s] = [z, x, y]
+        expected = np.array(
+            [
+                [0.0, 1.0, 0.0],  # Q10=0, Q11c=1, Q11s=0
+                [0.0, 0.0, 1.0],  # Q10=0, Q11c=0, Q11s=1
+                [1.0, 0.0, 0.0],  # Q10=1, Q11c=0, Q11s=0
+            ]
+        )
+        np.testing.assert_allclose(mu_sph, expected, rtol=1e-10)
+
+    def test_cartesian_to_spherical_quadrupole(self):
+        """Test quadrupole transformation consistency.
+
+        Verifies that Θzz = Q20 directly.
+        """
+        from openff_pympfit.mbis.multipole_transform import (
+            cartesian_to_spherical_quadrupole,
+        )
+
+        # Create a simple traceless quadrupole
+        # Θzz = 2, Θxx = -1, Θyy = -1 (traceless)
+        theta = np.zeros((1, 3, 3))
+        theta[0, 0, 0] = -1.0  # xx
+        theta[0, 1, 1] = -1.0  # yy
+        theta[0, 2, 2] = 2.0  # zz
+        theta[0, 0, 1] = theta[0, 1, 0] = 0.5  # xy
+        theta[0, 0, 2] = theta[0, 2, 0] = 0.3  # xz
+        theta[0, 1, 2] = theta[0, 2, 1] = 0.2  # yz
+
+        q_sph = cartesian_to_spherical_quadrupole(theta)
+
+        # Q20 = Θzz = 2.0
+        assert np.isclose(q_sph[0, 0], 2.0, rtol=1e-10)
+
+        # Check Q22c = (Θxx - Θyy) / √3 = (-1 - (-1)) / √3 = 0
+        assert np.isclose(q_sph[0, 3], 0.0, rtol=1e-10)
+
+    def test_cartesian_to_spherical_octupole(self):
+        """Test octupole transformation consistency.
+
+        Verifies that Ωzzz = Q30 directly.
+        """
+        from openff_pympfit.mbis.multipole_transform import (
+            cartesian_to_spherical_octupole,
+        )
+
+        # Create a simple octupole with Ωzzz = 5.0
+        omega = np.zeros((1, 3, 3, 3))
+        omega[0, 2, 2, 2] = 5.0  # zzz
+
+        o_sph = cartesian_to_spherical_octupole(omega)
+
+        # Q30 = Ωzzz = 5.0
+        assert np.isclose(o_sph[0, 0], 5.0, rtol=1e-10)
+
+    def test_cartesian_to_spherical_multipoles_combined(self):
+        """Test combined multipole transformation produces correct shape."""
+        from openff_pympfit.mbis.multipole_transform import (
+            cartesian_to_spherical_multipoles,
+        )
+
+        n_atoms = 3
+        charges = np.array([0.5, -0.25, -0.25])
+        dipoles = np.random.randn(n_atoms, 3)
+        quadrupoles = np.random.randn(n_atoms, 3, 3)
+        octupoles = np.random.randn(n_atoms, 3, 3, 3)
+
+        mp = cartesian_to_spherical_multipoles(
+            charges=charges,
+            dipoles=dipoles,
+            quadrupoles=quadrupoles,
+            octupoles=octupoles,
+            max_moment=4,
+        )
+
+        # Shape should be (n_atoms, (max_moment+1)^2) = (3, 25)
+        assert mp.shape == (n_atoms, 25)
+
+        # Charges should be preserved in first column
+        np.testing.assert_allclose(mp[:, 0], charges, rtol=1e-10)
+
+    def test_cartesian_multipoles_to_flat(self):
+        """Test flattened Cartesian format produces correct shape."""
+        from openff_pympfit.mbis.multipole_transform import (
+            cartesian_multipoles_to_flat,
+        )
+
+        n_atoms = 2
+        charges = np.array([1.0, -1.0])
+        dipoles = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        quadrupoles = np.random.randn(n_atoms, 3, 3)
+        octupoles = np.random.randn(n_atoms, 3, 3, 3)
+
+        mp = cartesian_multipoles_to_flat(
+            charges=charges,
+            dipoles=dipoles,
+            quadrupoles=quadrupoles,
+            octupoles=octupoles,
+            max_moment=3,
+        )
+
+        # Shape: 1 (charge) + 3 (dipole) + 6 (quadrupole) + 10 (octupole) = 20
+        assert mp.shape == (n_atoms, 20)
+
+        # Charges should be in first column
+        np.testing.assert_allclose(mp[:, 0], charges, rtol=1e-10)
+
+        # Dipoles should be in columns 1-3 (x, y, z order)
+        np.testing.assert_allclose(mp[:, 1:4], dipoles, rtol=1e-10)
+
+    def test_multipole_format_option_spherical(self):
+        """Test that multipole_format='spherical' is the default."""
+        settings = MBISSettings()
+        assert settings.multipole_format == "spherical"
+
+    def test_multipole_format_option_cartesian(self):
+        """Test that multipole_format='cartesian' can be set."""
+        settings = MBISSettings(multipole_format="cartesian")
+        assert settings.multipole_format == "cartesian"
+
+
 if __name__ == "__main__":
     pytest.main([__file__])

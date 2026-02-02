@@ -1,4 +1,4 @@
-"""Compute GDMA and multipole data using Psi4."""
+"""Compute MBIS multipole data using Psi4."""
 
 import os
 import subprocess
@@ -12,6 +12,10 @@ from openff.units.elements import SYMBOLS
 from openff.utilities import get_data_file_path, temporary_cd
 
 from openff_pympfit.mbis import MBISGenerator, MBISSettings
+from openff_pympfit.mbis.multipole_transform import (
+    cartesian_multipoles_to_flat,
+    cartesian_to_spherical_multipoles,
+)
 
 if TYPE_CHECKING:
     from openff.toolkit import Molecule
@@ -156,57 +160,44 @@ class Psi4MBISGenerator(MBISGenerator):
 
             mp = None
             if compute_mp:
-                # Load MBIS multipoles and combine into a single array
-                # The array format should match GDMA: (n_atoms, n_components)
-                # where n_components = (max_radial_moment + 1)^2
-                mbis_charges = np.load("mbis_charges.npy")
-                n_atoms = len(mbis_charges)
+                # Load MBIS Cartesian multipoles from Psi4 output files
+                mbis_charges = np.load("mbis_charges.npy").flatten()
                 max_moment = settings.max_radial_moment
 
-                # Calculate total components: (max_moment + 1)^2 for spherical harmonics
-                # l=0: 1, l=1: 3, l=2: 5, l=3: 7, l=4: 9 -> total = 25 for max_moment=4
-                n_components = (max_moment + 1) ** 2
-                mp = np.zeros((n_atoms, n_components))
-
-                # Monopole (charge) - 1 component (l=0)
-                mp[:, 0] = mbis_charges.flatten()
-
-                # Dipoles - 3 components (l=1, indices 1-3)
+                # Load dipoles if available
+                mbis_dipoles = None
                 if max_moment >= 1 and os.path.exists("mbis_dipoles.npy"):
                     mbis_dipoles = np.load("mbis_dipoles.npy")
-                    # Dipoles are (n_atoms, 3) - x, y, z components
-                    mp[:, 1:4] = mbis_dipoles
 
-                # Quadrupoles - 5 components (l=2, indices 4-8)
+                # Load quadrupoles if available
+                mbis_quadrupoles = None
                 if max_moment >= 2 and os.path.exists("mbis_quadrupoles.npy"):
                     mbis_quadrupoles = np.load("mbis_quadrupoles.npy")
-                    # Quadrupoles are (n_atoms, 3, 3) symmetric tensors
-                    # Extract unique components: xx, xy, xz, yy, yz (traceless form)
-                    # The zz component is determined by tracelessness: zz = -(xx + yy)
-                    for i in range(n_atoms):
-                        q = mbis_quadrupoles[i]
-                        # Store in order: xx, xy, xz, yy, yz
-                        mp[i, 4] = q[0, 0]  # xx
-                        mp[i, 5] = q[0, 1]  # xy
-                        mp[i, 6] = q[0, 2]  # xz
-                        mp[i, 7] = q[1, 1]  # yy
-                        mp[i, 8] = q[1, 2]  # yz
 
-                # Octupoles - 7 components (l=3, indices 9-15)
+                # Load octupoles if available
+                mbis_octupoles = None
                 if max_moment >= 3 and os.path.exists("mbis_octupoles.npy"):
                     mbis_octupoles = np.load("mbis_octupoles.npy")
-                    # Octupoles are (n_atoms, 3, 3, 3) symmetric tensors
-                    # Extract 7 unique components for traceless form
-                    for i in range(n_atoms):
-                        o = mbis_octupoles[i]
-                        # Store in order: xxx, xxy, xxz, xyy, xyz, xzz, yyy
-                        mp[i, 9] = o[0, 0, 0]  # xxx
-                        mp[i, 10] = o[0, 0, 1]  # xxy
-                        mp[i, 11] = o[0, 0, 2]  # xxz
-                        mp[i, 12] = o[0, 1, 1]  # xyy
-                        mp[i, 13] = o[0, 1, 2]  # xyz
-                        mp[i, 14] = o[0, 2, 2]  # xzz
-                        mp[i, 15] = o[1, 1, 1]  # yyy
+
+                # Convert to the requested format
+                if settings.multipole_format == "spherical":
+                    # Convert Cartesian to spherical harmonics (MPFIT compatible)
+                    mp = cartesian_to_spherical_multipoles(
+                        charges=mbis_charges,
+                        dipoles=mbis_dipoles,
+                        quadrupoles=mbis_quadrupoles,
+                        octupoles=mbis_octupoles,
+                        max_moment=max_moment,
+                    )
+                else:
+                    # Keep Cartesian representation (flattened)
+                    mp = cartesian_multipoles_to_flat(
+                        charges=mbis_charges,
+                        dipoles=mbis_dipoles,
+                        quadrupoles=mbis_quadrupoles,
+                        octupoles=mbis_octupoles,
+                        max_moment=max_moment,
+                    )
 
             with open("final-geometry.xyz") as file:
                 output_lines = file.read().splitlines(keepends=False)

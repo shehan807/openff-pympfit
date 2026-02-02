@@ -1,12 +1,20 @@
 import abc
 import os
-from typing import TYPE_CHECKING
+from enum import Enum
+from typing import TYPE_CHECKING, Literal
 
 from openff.units import Quantity, unit
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from openff.toolkit import Molecule
+
+
+class MultipoleFormat(str, Enum):
+    """Enumeration for multipole representation formats."""
+
+    SPHERICAL = "spherical"
+    CARTESIAN = "cartesian"
 
 
 class MBISSettings(BaseModel):
@@ -40,7 +48,11 @@ class MBISSettings(BaseModel):
         590, description="Number of spherical points for DFT integration."
     )
     max_radial_moment: int = Field(
-        4, description="Maximum radial moment to compute for each atom. n=1 to 4 supported with 1=charges, 2=dipoles, 3=quadrupoles, 4=octupoles."
+        4,
+        description=(
+            "Maximum radial moment to compute for each atom. "
+            "n=1 to 4 supported: 1=charges, 2=dipoles, 3=quadrupoles, 4=octupoles."
+        ),
     )
     mbis_d_convergence: int = Field(
         9, description="Density convergence criterion specifically for MBIS."
@@ -51,12 +63,19 @@ class MBISSettings(BaseModel):
     mbis_spherical_points: int = Field(
         590, description="Number of spherical points for MBIS integration."
     )
-    guess: str = Field(
-        "sad", description="The initial guess method for the SCF."
-    )
+    guess: str = Field("sad", description="The initial guess method for the SCF.")
 
     multipole_units: str = Field(
         "AU", description="Whether to print MBIS results in atomic units or SI."
+    )
+
+    multipole_format: Literal["spherical", "cartesian"] = Field(
+        "spherical",
+        description=(
+            "Format for multipole representation. 'spherical' converts MBIS "
+            "Cartesian multipoles to spherical harmonics (required for MPFIT). "
+            "'cartesian' keeps the native MBIS Cartesian representation."
+        ),
     )
 
     # MPFIT specific parameters - Agrees with GDMA defaults
