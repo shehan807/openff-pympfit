@@ -204,30 +204,32 @@ vector $\mathbf{p}$ that implicitly enforces atom-type equivalence.
 
 Atoms sharing the same type label are constrained to have equal total
 charges. Let $\mathcal{T}$ be a set of atoms sharing the same type, and
-let $i_1$ be the first atom in $\mathcal{T}$ (processed first by the
-optimizer). Each site $a$ where $\text{quse}_{a,i_1} = 1$ receives a
-free parameter from $\mathbf{p}$, defining the reference total charge
-for the type:
+let $i_1$ be the first atom in $\mathcal{T}$ (by index order). The
+reference total charge for the type is defined as the sum of $i_1$'s
+per-site charges, where each $q_{i_1}^a$ creates a free parameter in
+$\mathbf{p}$ for every contributing site (i.e., where
+$\text{quse}_{a,i_1} = 1$):
 
 $$
-q^{\text{total}}_{\mathcal{T}} = \sum_{\substack{a \\ \text{quse}_{a,i_1}=1}} q_{i_1}^a
+q^{\text{total}}_{\mathcal{T}} = \sum_a q_{i_1}^a
 $$ (eq:type_reference_charge)
 
 For every subsequent atom $i \in \mathcal{T}$ ($i \neq i_1$), each
-contributing site also receives a free parameter except the last site
-$a^*$ (the final $a$ for which $\text{quse}_{a,i} = 1$ in iteration
-order), which absorbs the difference:
+contributing site also creates a free parameter in $\mathbf{p}$, except
+the last contributing site $a^*$ (in index order), which absorbs the
+difference needed to match the reference total:
 
 $$
-q_i^{a^*} = q^{\text{total}}_{\mathcal{T}} - \sum_{\substack{a \neq a^* \\ \text{quse}_{a,i}=1}} q_i^a
+q_i^{a^*} = q^{\text{total}}_{\mathcal{T}} - \sum_{a \neq a^*} q_i^a
 $$ (eq:twin_constraint)
 
-If atom $i$ contributes to only one site, no free parameters are consumed
-and $q^{\text{total}}_{\mathcal{T}}$ is copied directly. This reduces
-the number of free parameters by one per subsequent atom in $\mathcal{T}$
-while exactly enforcing equal total charges across the type. The mapping
-from $\mathbf{p}$ to the full per-site charge matrix and total charges
-is performed by ``expandcharge``.
+The per-site charge distributions may differ between atoms in
+$\mathcal{T}$; only the totals are forced equal. If atom $i$ contributes
+to only one site, no free parameters are created and
+$q^{\text{total}}_{\mathcal{T}}$ is copied directly. This reduces the
+number of free parameters by one per subsequent atom in $\mathcal{T}$.
+The mapping from $\mathbf{p}$ to the full per-site charge matrix and
+total charges is performed by ``expandcharge``.
 
 ### Constrained Objective Function
 
