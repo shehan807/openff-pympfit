@@ -42,8 +42,10 @@ smiles_map = {
     "C6MIM": "CCCCCCN1C=C[N+](=C1)C",
 }
 
+molecules = []
 names = list(smiles_map.keys())
-molecules = [Molecule.from_smiles(smi) for smi in smiles_map.values()]
+for name, smi in smiles_map.items():
+    molecules.append(Molecule.from_smiles(smi))
 
 # atom type labels
 labels = generate_global_atom_type_labels(
@@ -61,21 +63,17 @@ if SQLITE_FILE.exists():
     store = MoleculeGDMAStore(str(SQLITE_FILE))
     for name, smi in smiles_map.items():
         recs = store.retrieve(smiles=smi)
-        if not recs:
-            raise ValueError(f"No record for {name}")
+        assert len(recs) > 0, f"No record for {name}"
         records.append(recs[0])
     print(f"Loaded records from {SQLITE_FILE.name}")
 else:
     settings = GDMASettings()
-    for name, mol in zip(names, molecules, strict=False):
+    for name, mol in zip(names, molecules):
         mol.generate_conformers(n_conformers=1)
         [conf] = extract_conformers(mol)
         t0 = time.perf_counter()
         coords, multipoles = Psi4GDMAGenerator.generate(
-            mol,
-            conf,
-            settings,
-            minimize=True,
+            mol, conf, settings, minimize=True,
         )
         print(f"{name} GDMA: {time.perf_counter() - t0:.2f}s")
         records.append(
@@ -86,12 +84,10 @@ print()
 # constrained fit
 solver = ConstrainedSciPySolver(conchg=10.0)
 parameters = generate_constrained_mpfit_charge_parameter(
-    records,
-    molecules,
-    solver=solver,
+    records, molecules, solver=solver,
 )
 
-for name, mol, param, lab in zip(names, molecules, parameters, labels, strict=False):
+for name, mol, param, lab in zip(names, molecules, parameters, labels):
     print(f"--- {name} ---")
     for i, atom in enumerate(mol.atoms):
         element = SYMBOLS[atom.atomic_number]
