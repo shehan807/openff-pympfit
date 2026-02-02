@@ -13,6 +13,7 @@ from openff.units import unit
 
 from pympfit.mpfit._mpfit import (
     _generate_dummy_values,
+    generate_global_atom_type_labels,
     generate_mpfit_charge_parameter,
     molecule_to_mpfit_library_charge,
 )
@@ -115,3 +116,42 @@ def test_generate_mpfit_charge_parameter(meoh_gdma_sto3g, n_copies: int):
 
     assert len(parameter.value) == len(expected_charges)
     assert np.allclose(parameter.value, expected_charges, atol=1e-4)
+
+
+class TestGenerateGlobalAtomTypeLabels:
+    """Test atom type label generation for symmetry and cross-molecule sharing."""
+
+    @pytest.mark.parametrize(
+        "smiles, symmetric_groups",
+        [
+            ("[O:1]([H:2])[H:3]", [(1, 2)]),
+            ("[O:1]=[C:2]=[O:3]", [(0, 2)]),
+            (
+                "[c:1]1([H:7])[c:2]([H:8])[c:3]([H:9])"
+                "[c:4]([H:10])[c:5]([H:11])[c:6]1[H:12]",
+                [(0, 1, 2, 3, 4, 5), (6, 7, 8, 9, 10, 11)],
+            ),
+        ],
+    )
+    def test_single_molecule_symmetry(self, smiles, symmetric_groups):
+        mol = Molecule.from_mapped_smiles(smiles, allow_undefined_stereo=True)
+        [labels] = generate_global_atom_type_labels([mol])
+        assert len(labels) == mol.n_atoms
+        for group in symmetric_groups:
+            assert len({labels[i] for i in group}) == 1, (
+                f"atoms {group} should share a label, got "
+                f"{[labels[i] for i in group]}"
+            )
+
+    def test_cross_molecule_label_sharing(self):
+        mmim = Molecule.from_smiles("CN1C=C[N+](=C1)C", allow_undefined_stereo=True)
+        emim = Molecule.from_smiles("CCN1C=C[N+](=C1)C", allow_undefined_stereo=True)
+        labels = generate_global_atom_type_labels([mmim, emim])
+
+        shared = set(labels[0]) & set(labels[1])
+        assert len(shared) > 0, "no labels shared between mmim and emim"
+
+        # Cross-molecule sharing should reduce total unique label count
+        total_unique = len(set(labels[0] + labels[1]))
+        sum_per_mol = len(set(labels[0])) + len(set(labels[1]))
+        assert total_unique < sum_per_mol
