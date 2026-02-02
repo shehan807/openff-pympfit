@@ -233,24 +233,15 @@ total charges is performed by ``expandcharge``.
 
 ### Constrained Objective Function
 
-The full constrained objective combines the multipole fitting error from each
-site with a per-molecule charge conservation penalty:
+The full constrained objective augments the unconstrained MPFIT objective
+(Equation {eq}`eq:F_optimization`) with a per-molecule charge conservation
+penalty:
 
 $$
 F_{\text{total}} = \underbrace{\sum_a F^a(\rho_1, \rho_2)}_{\text{multipole fit}} + \underbrace{\sum_{\text{mol}} \lambda \left(\sum_{i \in \text{mol}} q_i - Q_{\text{mol}}\right)^2}_{\text{charge conservation}}
 $$ (eq:constrained_objective)
 
-where each site contribution is
-
-$$
-F^a(\rho_1,\rho_2) = \sum_{l,m} \frac{4\pi}{2l + 1} W_{\rho_1,\rho_2,l} \left[Q_{lm}^a - \sum_i q_i^a R_{lm}^a(\mathbf{r}_i)\right]^2
-$$ (eq:constrained_site_objective)
-
-and the integration weights $W_{\rho_1,\rho_2,l}$ are defined in Equation
-{eq}`eq:W_weights`. Here $\rho_1 = r_{\text{vdw}} + r_1$ and
-$\rho_2 = r_{\text{vdw}} + r_2$ define the inner and outer integration bounds
-relative to each site's van der Waals radius.
-
+where $F^a(\rho_1, \rho_2)$ is defined in Equation {eq}`eq:F_optimization`.
 The parameter $\lambda$ (``conchg``) controls the strength of the charge
 conservation penalty. Larger values of $\lambda$ enforce stricter conservation
 at the cost of a slightly worse multipole fit. $Q_{\text{mol}}$ is the target
@@ -259,14 +250,10 @@ total charge for each molecule (e.g., +1 for a cation, 0 for a neutral).
 ### Jacobian
 
 The gradient of $F_{\text{total}}$ with respect to the full per-site charges
-has two contributions. The multipole fitting gradient at each site $a$ with
-respect to atom $j$ is
-
-$$
-\frac{\partial F^a}{\partial q_j^a} = -2 \sum_{l,m} \frac{4\pi}{2l+1} W_l \left[Q_{lm}^a - \sum_i q_i^a R_{lm}^a(\mathbf{r}_i)\right] R_{lm}^a(\mathbf{r}_j)
-$$ (eq:constrained_site_gradient)
-
-and the charge conservation gradient for atom $j$ in molecule $m$ is
+has two contributions. The multipole fitting gradient
+$\partial F^a / \partial q_j^a$ follows directly from Equation
+{eq}`eq:F_derivative`. The charge conservation gradient for atom $j$ in
+molecule $m$ is
 
 $$
 \frac{\partial F_{\text{con}}}{\partial q_j} = 2\lambda\left(\sum_{i \in m} q_i - Q_m\right)
