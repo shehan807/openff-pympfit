@@ -314,7 +314,6 @@ def generate_global_atom_type_labels(
 def generate_constrained_mpfit_charge_parameter(
     gdma_records: list[MoleculeGDMARecord],
     molecules: list["Molecule"],
-    molecule_charges: list[float] | float = 0.0,
     solver: "ConstrainedMPFITSolver | None" = None,
     atom_type_labels: list[list[str]] | None = None,
     radius: int = 2,
@@ -337,9 +336,8 @@ def generate_constrained_mpfit_charge_parameter(
         One GDMA record per molecule (one conformer each).
     molecules
         The molecules corresponding to each GDMA record, in the same order.
-    molecule_charges
-        Target total charge per molecule. A single float is broadcast to
-        all molecules.
+        The formal charge of each molecule is read from
+        ``molecule.total_charge``.
     solver
         The constrained solver to use. Defaults to ``ConstrainedSciPySolver``.
     atom_type_labels
@@ -371,6 +369,7 @@ def generate_constrained_mpfit_charge_parameter(
         One ``LibraryChargeParameter`` per molecule.
     """
     from pympfit.mpfit.solvers import (
+        ConstrainedMPFITSolver,
         ConstrainedMPFITState,
         ConstrainedSciPySolver,
         build_quse_matrix,
@@ -383,7 +382,14 @@ def generate_constrained_mpfit_charge_parameter(
         )
         raise ValueError(msg)
 
-    solver = ConstrainedSciPySolver() if solver is None else solver
+    if solver is None:
+        solver = ConstrainedSciPySolver()
+    elif not isinstance(solver, ConstrainedMPFITSolver):
+        msg = (
+            f"solver must be a ConstrainedMPFITSolver instance, "
+            f"got {type(solver).__name__}"
+        )
+        raise TypeError(msg)
 
     if atom_type_labels is None:
         atom_type_labels = generate_global_atom_type_labels(
@@ -406,16 +412,9 @@ def generate_constrained_mpfit_charge_parameter(
         label for mol_labels in atom_type_labels for label in mol_labels
     )
 
-    if isinstance(molecule_charges, int | float):
-        mol_charges = tuple(float(molecule_charges) for _ in gdma_records)
-    else:
-        if len(molecule_charges) != len(gdma_records):
-            msg = (
-                f"molecule_charges has {len(molecule_charges)} entries, "
-                f"but there are {len(gdma_records)} GDMA records"
-            )
-            raise ValueError(msg)
-        mol_charges = tuple(float(q) for q in molecule_charges)
+    mol_charges = tuple(
+        mol.total_charge.m_as(unit.elementary_charge) for mol in molecules
+    )
 
     all_xyz = []
     all_multipoles = []

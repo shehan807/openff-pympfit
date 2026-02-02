@@ -275,7 +275,7 @@ class ConstrainedMPFITSolver(abc.ABC):
         self,
         conchg: float = 1.0,
         method: str = "L-BFGS-B",
-        maxiter: int = 1000,
+        maxiter: int = 10000,
         ftol: float = 1e-8,
         gtol: float = 1e-6,
     ) -> None:
