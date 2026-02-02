@@ -7,8 +7,15 @@ from openff.units import unit
 
 from pympfit.gdma.psi4 import Psi4GDMAGenerator
 from pympfit.gdma.storage import MoleculeGDMARecord, MoleculeGDMAStore
-from pympfit.mpfit import generate_mpfit_charge_parameter
-from pympfit.mpfit.solvers import MPFITSVDSolver
+from pympfit.mpfit import (
+    generate_constrained_mpfit_charge_parameter,
+    generate_mpfit_charge_parameter,
+)
+from pympfit.mpfit.solvers import (
+    ConstrainedMPFITSolver,
+    ConstrainedSciPySolver,
+    MPFITSVDSolver,
+)
 
 DATA_DIR = Path(__file__).parent / "data" / "esp"
 GDMA_DIR = Path(__file__).parent / "data" / "gdma"
@@ -19,6 +26,7 @@ BOHR_TO_ANGSTROM = unit.convert(1.0, unit.bohr, unit.angstrom)
     "record_class, generator, solver",
     [
         (MoleculeGDMARecord, Psi4GDMAGenerator, MPFITSVDSolver()),
+        (MoleculeGDMARecord, Psi4GDMAGenerator, ConstrainedSciPySolver()),
     ],
 )
 @pytest.mark.parametrize(
@@ -88,7 +96,14 @@ def test_pympfit(
             molecule, gdma_conformer, multipoles, sto3g_gdma_settings
         )
 
-    parameter = generate_mpfit_charge_parameter([record], solver)
+    if isinstance(solver, ConstrainedMPFITSolver):
+        [parameter] = generate_constrained_mpfit_charge_parameter(
+            [record],
+            [molecule],
+            solver=solver,
+        )
+    else:
+        parameter = generate_mpfit_charge_parameter([record], solver)
     charges = np.array(parameter.value)
 
     # Point-charge ESP via Coulomb's law
