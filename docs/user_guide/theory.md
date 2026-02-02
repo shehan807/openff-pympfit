@@ -182,34 +182,93 @@ $$ (eq:total_charge)
 ## Constrained MPFIT
 
 The unconstrained MPFIT objective $F = \sum_a F^a$ can be augmented with two
-classes of constraints for transferable force field development.
+classes of constraints for transferable force field development: atom-type
+equivalence and per-molecule charge conservation. When fitting across multiple
+molecules simultaneously, these constraints enable transferable charge sets
+where chemically equivalent atoms in different molecules carry identical charges.
+
+### Parameterization
+
+In the constrained formulation, each atom $i$ contributes a charge $q_i^a$ at
+each multipole site $a$ for which it is within the cutoff radius (the "quse"
+mask). The total charge on atom $i$ is
+
+$$
+q_i = \sum_a q_i^a
+$$ (eq:total_charge_constrained)
+
+Rather than optimizing all $q_i^a$ directly, we work with a reduced parameter
+vector $\mathbf{p}$ that implicitly enforces atom-type equivalence.
 
 ### Atom-Type Equivalence
 
 Atoms sharing the same type label are constrained to have equal total charges.
 For atom $i$ with twin $k$ (the first atom sharing its type), the per-site
-charges $q_i^a$ are parameterized such that the last site absorbs the
-difference:
+charges $q_i^a$ are parameterized such that the last contributing site absorbs
+the difference:
 
 $$
 q_i^{a_\text{last}} = q_k^{\text{total}} - \sum_{a \neq a_\text{last}} q_i^a
 $$ (eq:twin_constraint)
 
 This reduces the number of free parameters by one per twinned atom while
-exactly enforcing $q_i^{\text{total}} = q_k^{\text{total}}$.
+exactly enforcing $q_i^{\text{total}} = q_k^{\text{total}}$. The mapping from
+the reduced parameter vector $\mathbf{p}$ to the full per-site charge matrix
+and total charges is performed by ``expandcharge``.
 
-### Per-Molecule Charge Conservation
+### Constrained Objective Function
 
-For multi-molecule fitting, the total charge of each molecule is driven toward
-its target $Q_\text{mol}$ via a penalty term:
+The full constrained objective combines the multipole fitting error from each
+site with a per-molecule charge conservation penalty:
 
 $$
-F_{\text{total}} = \sum_a F^a + \sum_{\text{mol}} \lambda \left(\sum_{i \in \text{mol}} q_i - Q_{\text{mol}}\right)^2
+F_{\text{total}} = \underbrace{\sum_a F^a(\rho_1, \rho_2)}_{\text{multipole fit}} + \underbrace{\sum_{\text{mol}} \lambda \left(\sum_{i \in \text{mol}} q_i - Q_{\text{mol}}\right)^2}_{\text{charge conservation}}
 $$ (eq:constrained_objective)
 
-where $\lambda$ (``conchg``) controls the strength of the charge conservation
-penalty. Larger values of $\lambda$ enforce stricter conservation at the cost
-of a slightly worse multipole fit.
+where each site contribution is
+
+$$
+F^a(\rho_1,\rho_2) = \sum_{l,m} \frac{4\pi}{2l + 1} W_{\rho_1,\rho_2,l} \left[Q_{lm}^a - \sum_i q_i^a R_{lm}^a(\mathbf{r}_i)\right]^2
+$$ (eq:constrained_site_objective)
+
+and the integration weights $W_{\rho_1,\rho_2,l}$ are defined in Equation
+{eq}`eq:W_weights`. Here $\rho_1 = r_{\text{vdw}} + r_1$ and
+$\rho_2 = r_{\text{vdw}} + r_2$ define the inner and outer integration bounds
+relative to each site's van der Waals radius.
+
+The parameter $\lambda$ (``conchg``) controls the strength of the charge
+conservation penalty. Larger values of $\lambda$ enforce stricter conservation
+at the cost of a slightly worse multipole fit. $Q_{\text{mol}}$ is the target
+total charge for each molecule (e.g., +1 for a cation, 0 for a neutral).
+
+### Jacobian
+
+The gradient of $F_{\text{total}}$ with respect to the full per-site charges
+has two contributions. The multipole fitting gradient at each site $a$ with
+respect to atom $j$ is
+
+$$
+\frac{\partial F^a}{\partial q_j^a} = -2 \sum_{l,m} \frac{4\pi}{2l+1} W_l \left[Q_{lm}^a - \sum_i q_i^a R_{lm}^a(\mathbf{r}_i)\right] R_{lm}^a(\mathbf{r}_j)
+$$ (eq:constrained_site_gradient)
+
+and the charge conservation gradient for atom $j$ in molecule $m$ is
+
+$$
+\frac{\partial F_{\text{con}}}{\partial q_j} = 2\lambda\left(\sum_{i \in m} q_i - Q_m\right)
+$$ (eq:constrained_charge_gradient)
+
+The full-space gradient is then projected into the reduced parameter space
+via the chain rule through ``expandcharge``, yielding the gradient
+$\nabla_{\mathbf{p}} F_{\text{total}}$ passed to the optimizer.
+
+### Optimization
+
+The constrained objective is minimized using ``scipy.optimize.minimize``
+(L-BFGS-B by default) with the analytic Jacobian. The optimizer
+receives the reduced parameter vector $\mathbf{p}$, which is expanded to
+full charges for each function and gradient evaluation. After convergence,
+the optimal $\mathbf{p}$ is expanded one final time to obtain the total
+charge per atom $q_i$.
 
 ## Virtual Sites
 

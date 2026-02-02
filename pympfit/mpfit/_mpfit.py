@@ -14,6 +14,8 @@ from pympfit.optimize import MPFITObjective
 if TYPE_CHECKING:
     from openff.toolkit import Molecule
 
+    from pympfit.mpfit.solvers import ConstrainedMPFITSolver
+
 
 def _generate_dummy_values(smiles: str) -> list[float]:
     """Generate a list of dummy values for a ``LibraryChargeParameter``.
@@ -161,3 +163,305 @@ def generate_mpfit_charge_parameter(
     mpfit_parameter.value = averaged_charges.tolist()
 
     return mpfit_parameter
+
+
+def generate_global_atom_type_labels(
+    molecules: list["Molecule"],
+    radius: int = 2,
+    equivalize_between_methyl_carbons: bool = True,
+    equivalize_between_methyl_hydrogens: bool = True,
+    equivalize_between_other_heavy_atoms: bool = True,
+    equivalize_between_other_hydrogen_atoms: bool = True,
+) -> list[list[str]]:
+    """Generate consistent atom type labels across multiple molecules.
+
+    This function implements a hybrid, hierarchical atom typing approach, in which:
+
+    1. **Within-molecule** equivalence is set via
+       ``get_atom_symmetries`` for topologically equivalent
+       atoms for the same molecule
+    2. **Cross-molecule** equivalence is set via Morgan
+       fingerprints, where local chemical environments
+       establish equivalence.
+
+    Two atoms receive the same label only if they share both the same
+    Morgan environment hash **and** the same within-molecule symmetry
+    group (relative to their Morgan group).
+
+    Parameters
+    ----------
+    molecules
+        The molecules to generate labels for.
+    radius
+        The Morgan fingerprint radius (in bonds) controlling cross-molecule
+        equivalence scope. Smaller values (2-3) match shared substructures
+        (e.g., imidazolium ring across EMIM/BMIM). Larger values require
+        more of the surrounding structure to match.
+    equivalize_between_methyl_carbons
+        Whether topologically symmetric methyl(ene) carbons (matched by
+        ``[#6X4H3,#6H4,#6X4H2:1]``) in **different** molecules should be
+        assigned an equivalent charge.
+    equivalize_between_methyl_hydrogens
+        Whether topologically symmetric methyl(ene) hydrogens (attached to
+        a methyl(ene) carbon) in **different** molecules should be assigned
+        an equivalent charge.
+    equivalize_between_other_heavy_atoms
+        Whether topologically symmetric heavy atoms that are not
+        methyl(ene) carbons in **different** molecules should be assigned
+        an equivalent charge.
+    equivalize_between_other_hydrogen_atoms
+        Whether topologically symmetric hydrogens that are not methyl(ene)
+        hydrogens in **different** molecules should be assigned an
+        equivalent charge.
+
+    Returns
+    -------
+        A list of label lists, one per molecule. Each inner list contains
+        one string label per atom, ordered by atom index.
+    """
+    from collections import defaultdict
+
+    from openff.recharge.utilities.toolkits import get_atom_symmetries
+    from openff.units.elements import SYMBOLS
+    from rdkit.Chem import rdFingerprintGenerator
+
+    # Global registries for cross-molecule label assignment
+    env_to_label_map: dict[tuple, str] = {}
+    element_counters: defaultdict[str, int] = defaultdict(int)
+    unique_atom_counter = 0
+    all_molecule_labels: list[list[str]] = []
+
+    for molecule in molecules:
+        mol_labels: list[str] = []
+
+        atom_symmetries = get_atom_symmetries(molecule)
+
+        # Atom classification ("within" molecule)
+        methyl_carbons = {
+            i for i, in molecule.chemical_environment_matches("[#6X4H3,#6H4,#6X4H2:1]")
+        }
+        methyl_hydrogens = {
+            atom.molecule_atom_index
+            for i in methyl_carbons
+            for atom in molecule.atoms[i].bonded_atoms
+            if atom.atomic_number == 1
+        }
+        other_heavy_atoms = {
+            i
+            for i, atom in enumerate(molecule.atoms)
+            if atom.atomic_number != 1 and i not in methyl_carbons
+        }
+        other_hydrogen_atoms = {
+            i
+            for i, atom in enumerate(molecule.atoms)
+            if atom.atomic_number == 1 and i not in methyl_hydrogens
+        }
+
+        # Cross-molecule hashing via Morgan fingerprints
+        rdkit_mol = molecule.to_rdkit()
+        morgan_gen = rdFingerprintGenerator.GetMorganGenerator(radius=radius)
+
+        atom_morgan_hashes = []
+        for i in range(molecule.n_atoms):
+            fp = morgan_gen.GetSparseCountFingerprint(rdkit_mol, fromAtoms=[i])
+            atom_morgan_hashes.append(tuple(sorted(fp.GetNonzeroElements().items())))
+
+        # have atoms shared within molecules take precendence
+        sym_group_to_atoms: defaultdict[int, list[int]] = defaultdict(list)
+        for i, sym in enumerate(atom_symmetries):
+            sym_group_to_atoms[sym].append(i)
+
+        representative_hash = list(atom_morgan_hashes)
+        for atom_indices in sym_group_to_atoms.values():
+            rep = atom_morgan_hashes[atom_indices[0]]
+            for idx in atom_indices:
+                representative_hash[idx] = rep
+
+        # Assign labels per atom
+        for i, atom in enumerate(molecule.atoms):
+            element = SYMBOLS[atom.atomic_number]
+            is_methyl_c = i in methyl_carbons
+            is_methyl_h = i in methyl_hydrogens
+
+            # Determine if cross-molecule equivalence applies
+            if is_methyl_c:
+                should_equivalize = equivalize_between_methyl_carbons
+            elif is_methyl_h:
+                should_equivalize = equivalize_between_methyl_hydrogens
+            elif i in other_heavy_atoms:
+                should_equivalize = equivalize_between_other_heavy_atoms
+            elif i in other_hydrogen_atoms:
+                should_equivalize = equivalize_between_other_hydrogen_atoms
+            else:
+                should_equivalize = False
+
+            if should_equivalize:
+                env_key = (element, representative_hash[i])
+                if env_key not in env_to_label_map:
+                    element_counters[element] += 1
+                    env_to_label_map[env_key] = f"{element}{element_counters[element]}"
+                mol_labels.append(env_to_label_map[env_key])
+            else:
+                # unique label across all molecules
+                unique_atom_counter += 1
+                mol_labels.append(f"{element}_u{unique_atom_counter}")
+
+        all_molecule_labels.append(mol_labels)
+
+    return all_molecule_labels
+
+
+def generate_constrained_mpfit_charge_parameter(
+    gdma_records: list[MoleculeGDMARecord],
+    molecules: list["Molecule"],
+    molecule_charges: list[float] | float = 0.0,
+    solver: "ConstrainedMPFITSolver | None" = None,
+    atom_type_labels: list[list[str]] | None = None,
+    radius: int = 2,
+    equivalize_between_methyl_carbons: bool = True,
+    equivalize_between_methyl_hydrogens: bool = True,
+    equivalize_between_other_heavy_atoms: bool = True,
+    equivalize_between_other_hydrogen_atoms: bool = True,
+) -> list[LibraryChargeParameter]:
+    """Fit constrained charges for one or more molecules.
+
+    When multiple molecules are provided, atoms in **different** molecules
+    that share the same atom type label are constrained to carry the same
+    charge. For a single molecule, within-molecule symmetry constraints
+    are still applied. Labels can be generated automatically via Morgan
+    fingerprints and within-molecule symmetry, or supplied directly.
+
+    Parameters
+    ----------
+    gdma_records
+        One GDMA record per molecule (one conformer each).
+    molecules
+        The molecules corresponding to each GDMA record, in the same order.
+    molecule_charges
+        Target total charge per molecule. A single float is broadcast to
+        all molecules.
+    solver
+        The constrained solver to use. Defaults to ``ConstrainedSciPySolver``.
+    atom_type_labels
+        Per-molecule atom type labels. If ``None``, labels are generated
+        automatically via ``generate_global_atom_type_labels``.
+    radius
+        Morgan fingerprint radius passed to
+        ``generate_global_atom_type_labels`` when ``atom_type_labels``
+        is ``None``.
+    equivalize_between_methyl_carbons
+        Whether topologically symmetric methyl(ene) carbons (matched by
+        ``[#6X4H3,#6H4,#6X4H2:1]``) in **different** molecules should be
+        assigned an equivalent charge.
+    equivalize_between_methyl_hydrogens
+        Whether topologically symmetric methyl(ene) hydrogens (attached to
+        a methyl(ene) carbon) in **different** molecules should be assigned
+        an equivalent charge.
+    equivalize_between_other_heavy_atoms
+        Whether topologically symmetric heavy atoms that are not
+        methyl(ene) carbons in **different** molecules should be assigned
+        an equivalent charge.
+    equivalize_between_other_hydrogen_atoms
+        Whether topologically symmetric hydrogens that are not methyl(ene)
+        hydrogens in **different** molecules should be assigned an
+        equivalent charge.
+
+    Returns
+    -------
+        One ``LibraryChargeParameter`` per molecule.
+    """
+    from pympfit.mpfit.solvers import (
+        ConstrainedMPFITState,
+        ConstrainedSciPySolver,
+        build_quse_matrix,
+    )
+
+    if len(gdma_records) != len(molecules):
+        msg = (
+            f"gdma_records has {len(gdma_records)} entries, "
+            f"but molecules has {len(molecules)}"
+        )
+        raise ValueError(msg)
+
+    solver = ConstrainedSciPySolver() if solver is None else solver
+
+    if atom_type_labels is None:
+        atom_type_labels = generate_global_atom_type_labels(
+            molecules,
+            radius=radius,
+            equivalize_between_methyl_carbons=equivalize_between_methyl_carbons,
+            equivalize_between_methyl_hydrogens=equivalize_between_methyl_hydrogens,
+            equivalize_between_other_heavy_atoms=equivalize_between_other_heavy_atoms,
+            equivalize_between_other_hydrogen_atoms=equivalize_between_other_hydrogen_atoms,
+        )
+
+    if len(atom_type_labels) != len(molecules):
+        msg = (
+            f"atom_type_labels has {len(atom_type_labels)} entries, "
+            f"but molecules has {len(molecules)}"
+        )
+        raise ValueError(msg)
+
+    flat_labels = tuple(
+        label for mol_labels in atom_type_labels for label in mol_labels
+    )
+
+    if isinstance(molecule_charges, int | float):
+        mol_charges = tuple(float(molecule_charges) for _ in gdma_records)
+    else:
+        if len(molecule_charges) != len(gdma_records):
+            msg = (
+                f"molecule_charges has {len(molecule_charges)} entries, "
+                f"but there are {len(gdma_records)} GDMA records"
+            )
+            raise ValueError(msg)
+        mol_charges = tuple(float(q) for q in molecule_charges)
+
+    all_xyz = []
+    all_multipoles = []
+    all_rvdw = []
+    all_lmax = []
+    atom_counts = []
+
+    for record in gdma_records:
+        arrays = MPFITObjective.extract_arrays(record)
+        all_xyz.append(arrays["bohr_conformer"])
+        all_multipoles.append(arrays["multipoles"])
+        all_rvdw.append(arrays["rvdw"])
+        all_lmax.append(arrays["lmax"])
+        atom_counts.append(arrays["n_atoms"])
+
+    settings = gdma_records[0].gdma_settings
+
+    xyzcharge = np.vstack(all_xyz)
+    xyzmult = np.vstack(all_xyz)
+    rvdw = np.concatenate(all_rvdw)
+
+    state = ConstrainedMPFITState(
+        xyzmult=xyzmult,
+        xyzcharge=xyzcharge,
+        multipoles=np.vstack(all_multipoles),
+        quse=build_quse_matrix(xyzmult, xyzcharge, rvdw),
+        atomtype=flat_labels,
+        rvdw=rvdw,
+        lmax=np.concatenate(all_lmax),
+        r1=settings.mpfit_inner_radius,
+        r2=settings.mpfit_outer_radius,
+        maxl=settings.limit,
+        atom_counts=tuple(atom_counts),
+        molecule_charges=mol_charges,
+    )
+
+    qstore = solver.solve(state)
+
+    # split charges by molecule → LibraryChargeParameter ──
+    parameters = []
+    offset = 0
+    for molecule, n in zip(molecules, atom_counts, strict=False):
+        mol_charges_arr = qstore[offset : offset + n]
+        param = molecule_to_mpfit_library_charge(molecule)
+        param.value = mol_charges_arr.tolist()
+        parameters.append(param)
+        offset += n
+
+    return parameters

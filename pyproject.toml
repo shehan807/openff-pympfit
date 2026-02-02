@@ -149,7 +149,7 @@ docstring-code-format = true
 # Core math: l/m are quantum numbers, A/Y/W are standard physics notation
 "pympfit/mpfit/core.py" = ["E741", "N802", "N803", "N806"]
 # Solvers: U/S/Vh are SVD notation, TRY301 raises in try are intentional
-"pympfit/mpfit/solvers.py" = ["N806", "TRY301"]
+"pympfit/mpfit/solvers.py" = ["E741", "N806", "TRY301"]
 # Optimize: A_matrix/site_A/site_b are standard physics matrix notation
 "pympfit/optimize/_optimize.py" = ["N806"]
 # Psi4: S607 partial executable path is intentional (psi4 expected in PATH)

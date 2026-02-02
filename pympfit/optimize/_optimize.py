@@ -37,6 +37,35 @@ class MPFITObjective(Objective):
         return MPFITObjectiveTerm
 
     @classmethod
+    def extract_arrays(
+        cls,
+        gdma_record: MoleculeGDMARecord,
+    ) -> dict:
+        """Extract numerical arrays from a single GDMA record."""
+        from openff.toolkit import Molecule
+
+        from pympfit.mpfit.core import _convert_flat_to_hierarchical
+
+        molecule = Molecule.from_mapped_smiles(
+            gdma_record.tagged_smiles, allow_undefined_stereo=True
+        )
+        settings = gdma_record.gdma_settings
+        bohr_conformer = unit.convert(gdma_record.conformer, unit.angstrom, unit.bohr)
+        multipoles = _convert_flat_to_hierarchical(
+            gdma_record.multipoles, molecule.n_atoms, settings.limit
+        )
+        return {
+            "bohr_conformer": bohr_conformer,
+            "multipoles": multipoles,
+            "rvdw": np.full(molecule.n_atoms, settings.mpfit_atom_radius),
+            "lmax": np.full(molecule.n_atoms, settings.limit, dtype=float),
+            "r1": settings.mpfit_inner_radius,
+            "r2": settings.mpfit_outer_radius,
+            "maxl": settings.limit,
+            "n_atoms": molecule.n_atoms,
+        }
+
+    @classmethod
     def compute_objective_terms(
         cls,
         gdma_records: list[MoleculeGDMARecord],
@@ -45,56 +74,27 @@ class MPFITObjective(Objective):
         _vsite_coordinate_parameter_keys: list[VirtualSiteGeometryKey] | None = None,
         return_quse_masks: bool = False,
     ) -> Generator[tuple[MPFITObjectiveTerm, dict] | MPFITObjectiveTerm, None, None]:
-        """Pre-calculates the terms that contribute to the total objective function.
-
-        This is an adaptation of the original compute_objective_terms method for MPFIT,
-        which works with multipole moments instead of ESP data.
-
-        For complete documentation, see the original method in the Objective class.
-        Note: BCC parameters are not applicable for MPFIT and have been removed.
-        """
-        from openff.toolkit import Molecule
-
-        from pympfit.mpfit.core import (
-            _convert_flat_to_hierarchical,
-            build_A_matrix,
-            build_b_vector,
-        )
+        """Pre-calculates the terms that contribute to the total objective function."""
+        from pympfit.mpfit.core import build_A_matrix, build_b_vector
 
         for gdma_record in gdma_records:
-            molecule: Molecule = Molecule.from_mapped_smiles(
-                gdma_record.tagged_smiles, allow_undefined_stereo=True
-            )
-            conformer = gdma_record.conformer
-
-            # Get MPFIT settings from the record
-            gdma_settings = gdma_record.gdma_settings
-            max_rank = gdma_settings.limit
-            r1 = gdma_settings.mpfit_inner_radius
-            r2 = gdma_settings.mpfit_outer_radius
-            default_atom_radius = gdma_settings.mpfit_atom_radius
-
-            # Convert the flat multipoles to hierarchical format
-            flat_multipoles = gdma_record.multipoles
-            num_sites = flat_multipoles.shape[0]
-            multipoles = _convert_flat_to_hierarchical(
-                flat_multipoles, num_sites, max_rank
-            )
+            arrays = cls.extract_arrays(gdma_record)
+            bohr_conformer = arrays["bohr_conformer"]
+            multipoles = arrays["multipoles"]
+            rvdw = arrays["rvdw"]
+            r1 = arrays["r1"]
+            r2 = arrays["r2"]
+            max_rank = arrays["maxl"]
+            n_atoms = arrays["n_atoms"]
 
             atom_charge_design_matrices = []
-
-            # Convert conformer from Angstroms to Bohrs
-            bohr_conformer = unit.convert(conformer, unit.angstrom, unit.bohr)
-
-            # Create rvdw array using the configured default atom radius
-            rvdw = np.full(molecule.n_atoms, default_atom_radius)
 
             # Prepare the reference values and quse_masks
             reference_values = []
             quse_masks = []
 
             # Process each atom site
-            for i in range(molecule.n_atoms):
+            for i in range(n_atoms):
                 # Calculate distances from current multipole site to all atoms
                 rqm = np.linalg.norm(bohr_conformer[i] - bohr_conformer, axis=1)
                 # Create mask for atoms within rvdw
@@ -116,7 +116,7 @@ class MPFITObjective(Objective):
                 if masked_charge_conformer.shape[0] == 0:
                     masked_charge_conformer = bohr_conformer
                     # Update the mask to include all atoms
-                    quse_masks[-1] = np.ones(molecule.n_atoms, dtype=bool)
+                    quse_masks[-1] = np.ones(n_atoms, dtype=bool)
 
                 # Use the multipole site coordinates and masked charge coordinates
                 site_A = build_A_matrix(
