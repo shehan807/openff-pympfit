@@ -87,17 +87,65 @@ class MPFITObjective(Objective):
             max_rank = arrays["maxl"]
             n_atoms = arrays["n_atoms"]
 
+            # === VSITE POSITION GENERATION ===
+            # When vsites are provided, generate their Cartesian positions and
+            # create augmented arrays that include both atoms and vsites
+            if vsite_collection is not None:
+                from openff.recharge.charges.vsite import VirtualSiteGenerator
+                from openff.toolkit import Molecule
+
+                molecule = Molecule.from_mapped_smiles(
+                    gdma_record.tagged_smiles, allow_undefined_stereo=True
+                )
+                conformer_angstrom = gdma_record.conformer
+
+                # Generate vsite positions and convert to bohr
+                vsite_positions = VirtualSiteGenerator.generate_positions(
+                    molecule, vsite_collection, conformer_angstrom * unit.angstrom
+                )
+                vsite_positions_bohr = unit.convert(
+                    vsite_positions.m_as(unit.angstrom), unit.angstrom, unit.bohr
+                )
+                n_vsites = vsite_positions_bohr.shape[0]
+
+                # Compute vsite charge/coord terms (inherited from Objective base)
+                (vsite_charge_assignment_matrix, vsite_fixed_charges) = (
+                    cls._compute_vsite_charge_terms(
+                        molecule, vsite_collection, _vsite_charge_parameter_keys or []
+                    )
+                )
+                (vsite_coord_assignment_matrix, vsite_fixed_coords,
+                 vsite_local_coordinate_frame) = (
+                    cls._compute_vsite_coord_terms(
+                        molecule, conformer_angstrom, vsite_collection,
+                        _vsite_coordinate_parameter_keys or []
+                    )
+                )
+
+                # Augment coords and rvdw to include vsites
+                augmented_coords_bohr = np.vstack([bohr_conformer, vsite_positions_bohr])
+                rvdw = np.concatenate([rvdw, np.full(n_vsites, arrays["r1"])])
+            else:
+                # No vsites - use atom-only arrays
+                n_vsites = 0
+                augmented_coords_bohr = bohr_conformer
+                vsite_charge_assignment_matrix = None
+                vsite_fixed_charges = None
+                vsite_coord_assignment_matrix = None
+                vsite_fixed_coords = None
+                vsite_local_coordinate_frame = None
+
             atom_charge_design_matrices = []
 
             # Prepare the reference values and quse_masks
             reference_values = []
             quse_masks = []
 
-            # Process each atom site
+            # Process each atom site (multipoles are only on atoms, not vsites)
             for i in range(n_atoms):
-                # Calculate distances from current multipole site to all atoms
-                rqm = np.linalg.norm(bohr_conformer[i] - bohr_conformer, axis=1)
-                # Create mask for atoms within rvdw
+                # Calculate distances from multipole site to ALL charge positions
+                # (atoms + vsites). This extends quse_mask to cover vsites too.
+                rqm = np.linalg.norm(augmented_coords_bohr - bohr_conformer[i], axis=1)
                 quse_mask = rqm < rvdw[i]
 
                 # Store the mask for later use by the solver
@@ -109,14 +157,14 @@ class MPFITObjective(Objective):
                 site_A = np.zeros((qsites, qsites))
                 site_b = np.zeros(qsites)
 
-                # Apply the mask to get charge positions to use
-                masked_charge_conformer = bohr_conformer[quse_mask]
+                # Apply mask to get charge positions (atoms + vsites within range)
+                masked_charge_conformer = augmented_coords_bohr[quse_mask]
 
                 # If no charges are within range, use all charges
                 if masked_charge_conformer.shape[0] == 0:
-                    masked_charge_conformer = bohr_conformer
-                    # Update the mask to include all atoms
-                    quse_masks[-1] = np.ones(n_atoms, dtype=bool)
+                    masked_charge_conformer = augmented_coords_bohr
+                    # Update mask to include all positions (atoms + vsites)
+                    quse_masks[-1] = np.ones(n_atoms + n_vsites, dtype=bool)
 
                 # Use the multipole site coordinates and masked charge coordinates
                 site_A = build_A_matrix(
@@ -142,29 +190,29 @@ class MPFITObjective(Objective):
                 atom_charge_design_matrices.append(site_A)
                 reference_values.append(site_b)
 
-            # We don't currently support virtual sites for MPFIT
-            if vsite_collection is not None:
-                raise NotImplementedError("Virtual sites are not supported for MPFIT")
-
             atom_charge_design_matrix = np.array(
                 atom_charge_design_matrices, dtype=object
             )
             reference_values = np.array(reference_values, dtype=object)
             quse_masks = np.array(quse_masks, dtype=object)
 
+            # Base class assertion requires all vsite fields non-None together.
+            # Use empty grid placeholder when vsites are present.
+            _GRID_PLACEHOLDER = np.empty((0, 3)) if n_vsites > 0 else None
+
             objective_term = cls._objective_term()(
                 atom_charge_design_matrix,
-                None,  # vsite_charge_assignment_matrix
-                None,  # vsite_fixed_charges
-                None,  # vsite_coord_assignment_matrix
-                None,  # vsite_fixed_coords
-                None,  # vsite_local_coordinate_frame
-                None,  # grid_coordinates not needed for MPFIT
+                vsite_charge_assignment_matrix,
+                vsite_fixed_charges,
+                vsite_coord_assignment_matrix,
+                vsite_fixed_coords,
+                vsite_local_coordinate_frame,
+                _GRID_PLACEHOLDER,
                 reference_values,
             )
 
             if return_quse_masks:
-                # Return the quse_masks along with the objective term
-                yield objective_term, {"quse_masks": quse_masks}
+                # Always include n_vsites so solver knows array sizes
+                yield objective_term, {"quse_masks": quse_masks, "n_vsites": n_vsites}
             else:
                 yield objective_term

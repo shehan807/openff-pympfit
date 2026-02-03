@@ -12,6 +12,7 @@ from pympfit.mpfit.solvers import MPFITSolver
 from pympfit.optimize import MPFITObjective
 
 if TYPE_CHECKING:
+    from openff.recharge.charges.vsite import VirtualSiteCollection
     from openff.toolkit import Molecule
 
     from pympfit.mpfit.solvers import ConstrainedMPFITSolver
@@ -70,7 +71,8 @@ def molecule_to_mpfit_library_charge(molecule: "Molecule") -> LibraryChargeParam
 def _fit_single_conformer(
     gdma_record: MoleculeGDMARecord,
     solver: "MPFITSolver",
-) -> np.ndarray:
+    vsite_collection: "VirtualSiteCollection | None" = None,
+) -> tuple[np.ndarray, np.ndarray | None]:
     """Fit charges for a single conformer.
 
     Parameters
@@ -79,35 +81,52 @@ def _fit_single_conformer(
         The GDMA record for this conformer.
     solver
         The solver to use for fitting.
+    vsite_collection
+        Optional virtual site collection defining extra charge sites.
 
     Returns
     -------
-        Array of fitted charges with shape (n_atoms,).
+        Tuple of (atom_charges, vsite_charges). vsite_charges is None if
+        no vsites are present.
     """
+    from openff.toolkit import Molecule
+
     # Generate objective term for this single conformer
     objective_terms_and_masks = list(
         MPFITObjective.compute_objective_terms(
             [gdma_record],
+            vsite_collection=vsite_collection,
             return_quse_masks=True,
         )
     )
 
     term, mask_dict = objective_terms_and_masks[0]
     quse_masks = mask_dict["quse_masks"]
+    n_vsites = mask_dict.get("n_vsites", 0)
 
     # Solve for this conformer
-    charges = solver.solve(
+    all_charges = solver.solve(
         np.array(term.atom_charge_design_matrix, dtype=object),
         np.array(term.reference_values, dtype=object),
-        ancillary_arrays={"quse_masks": quse_masks},
+        ancillary_arrays={"quse_masks": quse_masks, "n_vsites": n_vsites},
     )
 
-    return charges.flatten()
+    # Split into atom and vsite charges
+    molecule = Molecule.from_mapped_smiles(
+        gdma_record.tagged_smiles, allow_undefined_stereo=True
+    )
+    n_atoms = molecule.n_atoms
+    atom_charges = all_charges[:n_atoms].flatten()
+    vsite_charges = all_charges[n_atoms:].flatten() if n_vsites > 0 else None
+
+    return atom_charges, vsite_charges
 
 
 def generate_mpfit_charge_parameter(
-    gdma_records: list[MoleculeGDMARecord], solver: MPFITSolver | None
-) -> LibraryChargeParameter:
+    gdma_records: list[MoleculeGDMARecord],
+    solver: MPFITSolver | None = None,
+    vsite_collection: "VirtualSiteCollection | None" = None,
+) -> LibraryChargeParameter | tuple[LibraryChargeParameter, np.ndarray]:
     """Generate point charges that reproduce the distributed multipole analysis data.
 
     For multiple conformers, charges are fit independently for each conformer
@@ -122,10 +141,15 @@ def generate_mpfit_charge_parameter(
     solver
         The solver to use when finding the charges that minimize the MPFIT loss
         function. By default, the SVD solver is used.
+    vsite_collection
+        Optional virtual site collection defining extra charge sites beyond
+        atoms. When provided, charges are fit at both atom and vsite positions.
 
     Returns
     -------
-        The charges generated for the molecule.
+        When vsite_collection is None: LibraryChargeParameter with atom charges.
+        When vsite_collection is provided: Tuple of (LibraryChargeParameter,
+        vsite_charges) where vsite_charges is a numpy array of shape (n_vsites,).
     """
     from openff.toolkit import Molecule
 
@@ -152,15 +176,24 @@ def generate_mpfit_charge_parameter(
     mpfit_parameter = molecule_to_mpfit_library_charge(molecule)
 
     # Fit each conformer independently and average the results
-    all_charges = []
+    all_atom_charges = []
+    all_vsite_charges = []
     for record in gdma_records:
-        charges = _fit_single_conformer(record, solver)
-        all_charges.append(charges)
+        atom_charges, vsite_charges = _fit_single_conformer(
+            record, solver, vsite_collection
+        )
+        all_atom_charges.append(atom_charges)
+        if vsite_charges is not None:
+            all_vsite_charges.append(vsite_charges)
 
-    # Average charges across conformers
-    averaged_charges = np.mean(all_charges, axis=0)
+    # Average atom charges across conformers
+    averaged_atom_charges = np.mean(all_atom_charges, axis=0)
+    mpfit_parameter.value = averaged_atom_charges.tolist()
 
-    mpfit_parameter.value = averaged_charges.tolist()
+    # Return tuple only when vsites are present (backward compatible)
+    if vsite_collection is not None and all_vsite_charges:
+        averaged_vsite_charges = np.mean(all_vsite_charges, axis=0)
+        return mpfit_parameter, averaged_vsite_charges
 
     return mpfit_parameter
 

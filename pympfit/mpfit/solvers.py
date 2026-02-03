@@ -43,7 +43,7 @@ class MPFITSolver(abc.ABC):
 
         Returns
         -------
-            The set of charge values with shape=(n_atoms, 1)
+            The set of charge values with shape=(n_atoms + n_vsites, 1)
         """
         raise NotImplementedError
 
@@ -85,7 +85,8 @@ class MPFITSVDSolver(MPFITSolver):
 
         Returns
         -------
-            Charge values that reproduce the multipole moments.
+            Charge values with shape=(n_atoms + n_vsites, 1). When no vsites
+            are present, this is simply (n_atoms, 1).
         """
         is_object_array = hasattr(
             design_matrix, "dtype"
@@ -99,7 +100,8 @@ class MPFITSVDSolver(MPFITSolver):
         quse_masks = ancillary_arrays["quse_masks"]
 
         n_atoms = len(design_matrix)
-        charge_values = np.zeros((n_atoms, 1))
+        n_vsites = ancillary_arrays.get("n_vsites", 0)
+        charge_values = np.zeros((n_atoms + n_vsites, 1))
 
         # Solve for each multipole site
         for i in range(len(design_matrix)):
