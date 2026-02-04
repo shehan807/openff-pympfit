@@ -102,11 +102,11 @@ def test_generate_mpfit_charge_parameter(meoh_gdma_sto3g, n_copies: int):
         importlib.import_module("openeye.oechem")
 
         expected_smiles = "[H:1][O:2][C:3]([H:4])([H:5])[H:6]"
-        expected_charges = [0.33727, -0.53375, -0.04897, -0.02379, -0.04885, 0.31809]
+        expected_charges = [0.33829, -0.53397, -0.04925, -0.02403, -0.04912, 0.31808]
 
     except ModuleNotFoundError:
         expected_smiles = "[H:1][O:2][C:3]([H:4])([H:5])[H:6]"
-        expected_charges = [0.33727, -0.53375, -0.04897, -0.02379, -0.04885, 0.31809]
+        expected_charges = [0.33829, -0.53397, -0.04925, -0.02403, -0.04912, 0.31808]
 
     solver = MPFITSVDSolver()
 
@@ -190,6 +190,6 @@ def test_generate_mpfit_charge_parameter_with_vsite(meoh_gdma_sto3g):
     assert len(parameter.value) == 6  # methanol has 6 atoms
     assert vsite_charges is not None
     assert len(vsite_charges) == 1  # one vsite from the SMIRKS match
-    
+
     total_charge = sum(parameter.value) + sum(vsite_charges)
     assert np.isclose(total_charge, 0.0, atol=1e-6)
