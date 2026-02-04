@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import numpy as np
 from openff.recharge.charges.vsite import (
@@ -11,6 +12,9 @@ from openff.units import unit
 
 from pympfit.gdma.storage import MoleculeGDMARecord
 
+if TYPE_CHECKING:
+    import torch
+
 
 class MPFITObjectiveTerm(ObjectiveTerm):
     """Store precalculated values for multipole moment fitting.
@@ -21,13 +25,13 @@ class MPFITObjectiveTerm(ObjectiveTerm):
     Attributes
     ----------
     gdma_record : MoleculeGDMARecord | None
-        Reference to the source GDMA record. 
+        Reference to the source GDMA record.
     quse_masks : np.ndarray | None
         Boolean masks indicating which charges are included for each multipole
-        site. 
+        site.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.gdma_record: MoleculeGDMARecord | None = None
         self.quse_masks: np.ndarray | None = None
@@ -36,7 +40,11 @@ class MPFITObjectiveTerm(ObjectiveTerm):
     def _objective(cls) -> type["MPFITObjective"]:
         return MPFITObjective
 
-    def predict(self, charge_parameters, vsite_coordinate_parameters=None):
+    def predict(
+        self,
+        charge_parameters: "torch.Tensor",
+        vsite_coordinate_parameters: "torch.Tensor | None" = None,
+    ) -> list["torch.Tensor"]:
         """Predict multipole moment contributions for given charges and vsite positions.
 
         This method is designed for Bayesian inference and rebuilds A matrices
@@ -72,7 +80,7 @@ class MPFITObjectiveTerm(ObjectiveTerm):
         from openff.recharge.charges.vsite import VirtualSiteGenerator
         from openff.recharge.utilities.tensors import append_zero
 
-        from pympfit.mpfit.core_torch import build_A_matrix_torch
+        from pympfit.mpfit.core import build_A_matrix_torch
 
         if self.vsite_local_coordinate_frame is None:
             raise ValueError(
@@ -97,7 +105,7 @@ class MPFITObjectiveTerm(ObjectiveTerm):
         bohr_conformer = torch.from_numpy(bohr_conformer_np)
         n_atoms = bohr_conformer.shape[0]
 
-        # compute new vsite Cartesian positions from local frame 
+        # compute new vsite Cartesian positions from local frame
         trainable = append_zero(vsite_coordinate_parameters.flatten())[
             self.vsite_coord_assignment_matrix
         ]
@@ -120,11 +128,12 @@ class MPFITObjectiveTerm(ObjectiveTerm):
         if n_trainable_vsite_charges > 0:
             # redistribute vsite charge increments to parent atoms
             trainable_vsite_charges = charge_parameters[n_atoms:]
-            vsite_charge_matrix_t = torch.from_numpy(self.vsite_charge_assignment_matrix)
+            vsite_charge_matrix_t = torch.from_numpy(
+                self.vsite_charge_assignment_matrix
+            )
             vsite_fixed_charges_t = torch.from_numpy(self.vsite_fixed_charges)
             charge_adjustment = (
-                vsite_charge_matrix_t @ trainable_vsite_charges
-                + vsite_fixed_charges_t
+                vsite_charge_matrix_t @ trainable_vsite_charges + vsite_fixed_charges_t
             )
         else:
             charge_adjustment = torch.from_numpy(self.vsite_fixed_charges)
@@ -237,15 +246,20 @@ class MPFITObjective(Objective):
                         molecule, vsite_collection, _vsite_charge_parameter_keys or []
                     )
                 )
-                (vsite_coord_assignment_matrix, vsite_fixed_coords,
-                 vsite_local_coordinate_frame) = (
-                    cls._compute_vsite_coord_terms(
-                        molecule, conformer_angstrom, vsite_collection,
-                        _vsite_coordinate_parameter_keys or []
-                    )
+                (
+                    vsite_coord_assignment_matrix,
+                    vsite_fixed_coords,
+                    vsite_local_coordinate_frame,
+                ) = cls._compute_vsite_coord_terms(
+                    molecule,
+                    conformer_angstrom,
+                    vsite_collection,
+                    _vsite_coordinate_parameter_keys or [],
                 )
 
-                augmented_coords_bohr = np.vstack([bohr_conformer, vsite_positions_bohr])
+                augmented_coords_bohr = np.vstack(
+                    [bohr_conformer, vsite_positions_bohr]
+                )
                 rvdw = np.concatenate([rvdw, np.full(n_vsites, arrays["r1"])])
             else:
                 n_vsites = 0
