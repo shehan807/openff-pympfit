@@ -1,0 +1,26 @@
+graph TB
+    Input[openff.toolkit.Molecule]
+    Output[LibraryChargeParameter]
+
+    subgraph PyMPFIT
+        GDMA[gdma<br/>Psi4/GDMA · Jinja2]
+        Storage[storage<br/>SQLite/SQLAlchemy]
+        Optimize[optimize<br/>Objective Functions]
+        MPFIT[mpfit<br/>SVD · L-BFGS-B]
+    end
+
+    Input --> GDMA
+    GDMA --> Storage
+    Storage --> Optimize
+    Optimize --> MPFIT
+    MPFIT --> Output
+
+    Output -.-> OpenFF[OpenFF Ecosystem]
+
+    classDef module fill:#f5f5f5,stroke:#333,stroke-width:1px
+    classDef io fill:#fff,stroke:#333,stroke-width:2px
+    classDef eco fill:#fff,stroke:#999,stroke-dasharray:3
+
+    class GDMA,Storage,Optimize,MPFIT module
+    class Input,Output io
+    class OpenFF eco
