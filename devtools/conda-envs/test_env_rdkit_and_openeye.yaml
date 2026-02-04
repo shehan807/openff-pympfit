@@ -38,6 +38,13 @@ dependencies:
   # Optimization
   - pytorch
 
+  # Bayesian virtual site fitting
+  - pyro-ppl
+  - arviz
+  - matplotlib
+  - pip:
+    - sphericart-torch
+
     # Testing
   - pytest
   - pytest-cov

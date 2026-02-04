@@ -12,6 +12,15 @@ PyMPFIT depends on `OpenFF <https://openforcefield.org/>`_ packages which are di
 
 *Works with conda, mamba, or micromamba.*
 
+Bayesian Virtual Site Fitting
+-----------------------------
+
+For Bayesian optimization of virtual site parameters:
+
+.. code-block:: bash
+
+   pip install pyro-ppl arviz matplotlib sphericart-torch
+
 Development Installation
 ------------------------
 

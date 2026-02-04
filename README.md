@@ -26,6 +26,14 @@ conda activate pympfit
 pip install pympfit
 ```
 
+### Bayesian Virtual Site Fitting
+
+For Bayesian optimization of virtual site parameters:
+
+```bash
+pip install pyro-ppl arviz matplotlib sphericart-torch
+```
+
 ### Development Installation
 
 ```bash
