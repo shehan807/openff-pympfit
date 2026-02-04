@@ -18,19 +18,33 @@ PyMPFIT is a free, open-source software for performing partial atomic charge fit
 
 ## Installation
 
-**Install from source:**
+PyMPFIT depends on [OpenFF](https://openforcefield.org/) packages which are distributed via conda-forge.
 
 ```bash
+conda create -n pympfit python=3.12 openff-recharge openff-interchange openff-utilities psi4 pygdma -c conda-forge -y
+conda activate pympfit
+pip install pympfit
+```
+
+### Bayesian Virtual Site Fitting
+
+For Bayesian optimization of virtual site parameters:
+
+```bash
+pip install pyro-ppl arviz matplotlib sphericart-torch
+```
+
+### Development Installation
+
+```bash
+conda create -n pympfit-dev python=3.12 openff-recharge openff-interchange openff-utilities psi4 pygdma -c conda-forge -y
+conda activate pympfit-dev
 git clone https://github.com/shehan807/pympfit.git
 cd pympfit
-pip install -e .
+pip install -e ".[test]"
 ```
 
-**Note:** GDMA functionality requires Psi4 and PyGDMA:
-
-```bash
-pip install psi4 pygdma
-```
+*Works with conda, mamba, or micromamba.*
 
 ## Quick Example
 

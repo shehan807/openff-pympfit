@@ -146,8 +146,8 @@ docstring-code-format = true
 # Legacy files: l is physics convention for angular momentum, W is standard notation, print is intentional
 "pympfit/mpfit/_legacy.py" = ["E741", "T201"]
 "pympfit/mpfit/_legacy_constrained.py" = ["E741", "N806", "T201"]
-# Core math: l/m are quantum numbers, A/Y/W are standard physics notation
-"pympfit/mpfit/core.py" = ["E741", "N802", "N803", "N806"]
+# Core math: l/m are quantum numbers, A/Y/W are standard physics notation, m used for loop indexing
+"pympfit/mpfit/core.py" = ["B007", "E741", "N802", "N803", "N806"]
 # Solvers: U/S/Vh are SVD notation, TRY301 raises in try are intentional
 "pympfit/mpfit/solvers.py" = ["E741", "N806", "TRY301"]
 # Optimize: A_matrix/site_A/site_b are standard physics matrix notation

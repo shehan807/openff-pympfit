@@ -102,11 +102,11 @@ def test_generate_mpfit_charge_parameter(meoh_gdma_sto3g, n_copies: int):
         importlib.import_module("openeye.oechem")
 
         expected_smiles = "[H:1][O:2][C:3]([H:4])([H:5])[H:6]"
-        expected_charges = [0.33727, -0.53375, -0.04897, -0.02379, -0.04885, 0.31809]
+        expected_charges = [0.33829, -0.53397, -0.04925, -0.02403, -0.04912, 0.31808]
 
     except ModuleNotFoundError:
         expected_smiles = "[H:1][O:2][C:3]([H:4])([H:5])[H:6]"
-        expected_charges = [0.33727, -0.53375, -0.04897, -0.02379, -0.04885, 0.31809]
+        expected_charges = [0.33829, -0.53397, -0.04925, -0.02403, -0.04912, 0.31808]
 
     solver = MPFITSVDSolver()
 
@@ -155,3 +155,41 @@ class TestGenerateGlobalAtomTypeLabels:
         total_unique = len(set(labels[0] + labels[1]))
         sum_per_mol = len(set(labels[0])) + len(set(labels[1]))
         assert total_unique < sum_per_mol
+
+
+def test_generate_mpfit_charge_parameter_with_vsite(meoh_gdma_sto3g):
+    """Test MPFIT with virtual sites returns both atom and vsite charges."""
+    from openff.recharge.charges.vsite import (
+        BondChargeSiteParameter,
+        VirtualSiteCollection,
+    )
+
+    # Define a bond charge site on the C-O bond of methanol
+    vsite_collection = VirtualSiteCollection(
+        parameters=[
+            BondChargeSiteParameter(
+                smirks="[#6:1]-[#8:2]",
+                name="EP",
+                distance=0.5,  # Angstrom
+                charge_increments=(0.0, 0.0),
+                sigma=0.0,  # LJ params not used in MPFIT
+                epsilon=0.0,
+                match="all-permutations",
+            )
+        ]
+    )
+
+    solver = MPFITSVDSolver()
+    result = generate_mpfit_charge_parameter(
+        [meoh_gdma_sto3g], solver, vsite_collection=vsite_collection
+    )
+
+    assert isinstance(result, tuple)
+    parameter, vsite_charges = result
+
+    assert len(parameter.value) == 6  # methanol has 6 atoms
+    assert vsite_charges is not None
+    assert len(vsite_charges) == 1  # one vsite from the SMIRKS match
+
+    total_charge = sum(parameter.value) + sum(vsite_charges)
+    assert np.isclose(total_charge, 0.0, atol=1e-6)

@@ -5,6 +5,7 @@ import pytest
 from openff.toolkit import Molecule
 from openff.units import unit
 
+from pympfit import GDMASettings
 from pympfit.gdma.psi4 import Psi4GDMAGenerator
 from pympfit.gdma.storage import MoleculeGDMARecord, MoleculeGDMAStore
 from pympfit.mpfit import (
@@ -204,3 +205,120 @@ def test_pympfit_multi(molecule_names, smiles_list, solver):
             assert np.allclose(
                 qs, qs[0], atol=1e-4
             ), f"label {lbl}: charges {qs} not equal"
+
+
+@pytest.mark.parametrize(
+    "molecule_name, smiles, vsite_smirks, vsite_kwargs, match_type",
+    [
+        # TIP4P-FB-like DivalentLonePair on H-O-H bisector
+        (
+            "water",
+            "[O:1]([H:2])[H:3]",
+            "[#1:2]-[#8X2H2:1]-[#1:3]",
+            {"distance": 0.15, "out_of_plane_angle": 0.0},
+            "once",
+        ),
+    ],
+)
+def test_pympfit_vsite(
+    molecule_name,
+    smiles,
+    vsite_smirks,
+    vsite_kwargs,
+    match_type,
+):
+    from openff.recharge.charges.vsite import (
+        DivalentLonePairParameter,
+        VirtualSiteCollection,
+        VirtualSiteGenerator,
+    )
+
+    gdma_settings = GDMASettings(
+        method="scf",
+        basis="sto-3g",
+        limit=2,
+        switch=0.0,
+        radius=["C", 0.53, "O", 0.53, "N", 0.53, "H", 0.53, "F", 0.53],
+    )
+
+    grid = np.load(DATA_DIR / f"{molecule_name}_grid.npy")
+    ref_esp = np.load(DATA_DIR / f"{molecule_name}_esp.npy").flatten()
+    conformer = np.load(DATA_DIR / f"{molecule_name}_conformer.npy")
+
+    molecule = Molecule.from_mapped_smiles(smiles, allow_undefined_stereo=True)
+    formal_charge = molecule.total_charge.m_as(unit.elementary_charge)
+
+    gdma_conformer, multipoles = Psi4GDMAGenerator.generate(
+        molecule,
+        conformer * unit.angstrom,
+        gdma_settings,
+        minimize=False,
+    )
+    record = MoleculeGDMARecord.from_molecule(
+        molecule, gdma_conformer, multipoles, gdma_settings
+    )
+
+    solver = MPFITSVDSolver()
+    coord = gdma_conformer.m_as(unit.angstrom)
+
+    # fit WITHOUT vsite
+    param_no_vsite = generate_mpfit_charge_parameter([record], solver)
+    charges_no_vsite = np.array(param_no_vsite.value)
+
+    diff = grid[:, np.newaxis, :] - coord[np.newaxis, :, :]
+    distances = np.linalg.norm(diff, axis=2)
+    calc_esp_no_vsite = (
+        np.sum(charges_no_vsite[np.newaxis, :] / distances, axis=1) * BOHR_TO_ANGSTROM
+    )
+    rmse_no_vsite = np.sqrt(np.mean((ref_esp - calc_esp_no_vsite) ** 2))
+
+    # fit WITH vsite
+    n_atoms_in_smirks = vsite_smirks.count(":")
+    charge_increments = (0.0,) * n_atoms_in_smirks
+
+    vsite_collection = VirtualSiteCollection(
+        parameters=[
+            DivalentLonePairParameter(
+                smirks=vsite_smirks,
+                name="EP",
+                charge_increments=charge_increments,
+                sigma=0.0,
+                epsilon=0.0,
+                match=match_type,
+                **vsite_kwargs,
+            )
+        ]
+    )
+
+    result = generate_mpfit_charge_parameter(
+        [record], solver, vsite_collection=vsite_collection
+    )
+    param_with_vsite, vsite_charges = result
+    charges_with_vsite = np.array(param_with_vsite.value)
+
+    # Get vsite positions for ESP calculation
+    vsite_positions = VirtualSiteGenerator.generate_positions(
+        molecule, vsite_collection, gdma_conformer
+    )
+    vsite_coords = vsite_positions.m_as(unit.angstrom)
+
+    all_coords = np.vstack([coord, vsite_coords])
+    all_charges = np.concatenate([charges_with_vsite, vsite_charges])
+
+    diff_vsite = grid[:, np.newaxis, :] - all_coords[np.newaxis, :, :]
+    distances_vsite = np.linalg.norm(diff_vsite, axis=2)
+    calc_esp_with_vsite = (
+        np.sum(all_charges[np.newaxis, :] / distances_vsite, axis=1) * BOHR_TO_ANGSTROM
+    )
+    rmse_with_vsite = np.sqrt(np.mean((ref_esp - calc_esp_with_vsite) ** 2))
+
+    # charge conservation
+    total_charge = np.sum(all_charges)
+    assert np.isclose(
+        total_charge, formal_charge, atol=0.05
+    ), f"sum(charges) = {total_charge:.4f}, expected {formal_charge}"
+
+    assert rmse_with_vsite <= rmse_no_vsite * 1.5, (
+        f"Vsite fit should remain reasonable: "
+        f"RMSE {rmse_with_vsite:.6f} > {rmse_no_vsite:.6f} * 1.5"
+    )

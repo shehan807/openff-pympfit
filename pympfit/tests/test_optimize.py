@@ -228,3 +228,234 @@ class TestComputeObjectiveTerms:
 
         assert len(objective_terms) == 1
         assert isinstance(objective_terms[0], MPFITObjectiveTerm)
+
+
+torch = pytest.importorskip("torch")
+
+
+class TestPredict:
+
+    @pytest.mark.parametrize(
+        "distance1,distance2",
+        [
+            (0.3, 0.7),
+            (0.5, 1.5),
+            (0.7, 2.7),
+            (1.0, 5.0),
+        ],
+    )
+    def test_predict_shape_consistency(self, meoh_gdma_sto3g, distance1, distance2):
+        """Test that predict() returns consistent shapes across different distances."""
+        from openff.recharge.charges.vsite import (
+            BondChargeSiteParameter,
+            VirtualSiteCollection,
+        )
+
+        vsite_collection = VirtualSiteCollection(
+            parameters=[
+                BondChargeSiteParameter(
+                    smirks="[#6:1]-[#8:2]",
+                    name="EP",
+                    distance=0.5,
+                    charge_increments=(0.0, 0.0),
+                    sigma=0.0,
+                    epsilon=0.0,
+                    match="all-permutations",
+                )
+            ]
+        )
+        vsite_coord_keys = [("[#6:1]-[#8:2]", "BondCharge", "EP", "distance")]
+
+        objective_term, metadata = next(
+            MPFITObjective.compute_objective_terms(
+                [meoh_gdma_sto3g],
+                vsite_collection=vsite_collection,
+                _vsite_coordinate_parameter_keys=vsite_coord_keys,
+                return_quse_masks=True,
+            )
+        )
+
+        n_atoms = 6
+        charge_params = torch.ones((n_atoms, 1), dtype=torch.float64) * 0.1
+
+        pred1 = objective_term.predict(
+            charge_params, torch.tensor([[distance1]], dtype=torch.float64)
+        )
+        pred2 = objective_term.predict(
+            charge_params, torch.tensor([[distance2]], dtype=torch.float64)
+        )
+
+        # Number of predictions must match reference_values for loss() to work
+        assert len(pred1) == len(pred2), (
+            f"Lengths differ: {len(pred1)} vs {len(pred2)} "
+            f"at distances {distance1}, {distance2}"
+        )
+        assert len(pred1) == objective_term.reference_values.shape[0]
+
+        # Inner arrays may have different sizes due to quse_mask changes
+        # Just verify predictions are not identical (content differs)
+        predictions_differ = False
+        for p1, p2 in zip(pred1, pred2, strict=False):
+            p1_arr = p1.detach().numpy().flatten()
+            p2_arr = p2.detach().numpy().flatten()
+            # Compare sums as a simple difference check (handles different sizes)
+            if not np.isclose(p1_arr.sum(), p2_arr.sum()):
+                predictions_differ = True
+
+        assert predictions_differ, "Predictions should differ at different distances"
+
+    @pytest.mark.parametrize(
+        "vsite_increments",
+        [
+            (0.0, 0.0),
+            (0.1, 0.1),
+            (0.2, -0.1),
+            (-0.15, 0.25),
+        ],
+    )
+    def test_predict_charge_conservation(self, meoh_gdma_sto3g, vsite_increments):
+        """Test that charge conservation is maintained in predict().
+
+        The vsite_charge_assignment_matrix encodes charge redistribution:
+        when a vsite has charge, atoms bonded to it are adjusted to conserve
+        total molecular charge.
+        """
+        from openff.recharge.charges.vsite import (
+            BondChargeSiteParameter,
+            VirtualSiteCollection,
+        )
+
+        vsite_collection = VirtualSiteCollection(
+            parameters=[
+                BondChargeSiteParameter(
+                    smirks="[#6:1]-[#8:2]",
+                    name="EP",
+                    distance=0.5,
+                    charge_increments=(0.1, 0.1),
+                    sigma=0.0,
+                    epsilon=0.0,
+                    match="all-permutations",
+                )
+            ]
+        )
+
+        vsite_charge_keys = [
+            ("[#6:1]-[#8:2]", "BondCharge", "EP", 0),
+            ("[#6:1]-[#8:2]", "BondCharge", "EP", 1),
+        ]
+        vsite_coord_keys = [("[#6:1]-[#8:2]", "BondCharge", "EP", "distance")]
+
+        objective_term, metadata = next(
+            MPFITObjective.compute_objective_terms(
+                [meoh_gdma_sto3g],
+                vsite_collection=vsite_collection,
+                _vsite_charge_parameter_keys=vsite_charge_keys,
+                _vsite_coordinate_parameter_keys=vsite_coord_keys,
+                return_quse_masks=True,
+            )
+        )
+
+        # verify assignment matrix structure (columns sum to 0)
+        assignment_matrix = objective_term.vsite_charge_assignment_matrix
+        column_sums = assignment_matrix.sum(axis=0)
+        assert np.allclose(
+            column_sums, 0.0
+        ), f"Columns should sum to 0, got {column_sums}"
+
+        # verify fixed charges sum to 0 (required for conservation)
+        fixed_charges_sum = objective_term.vsite_fixed_charges.sum()
+        assert np.isclose(
+            fixed_charges_sum, 0.0, atol=1e-10
+        ), f"Fixed charges should sum to 0, got {fixed_charges_sum}"
+
+        # verify actual charges sum to formal charge
+        n_atoms = 6
+        atom_charges = np.array([[0.1], [-0.2], [0.05], [0.05], [0.0], [0.0]])
+        trainable_vsite = np.array([[vsite_increments[0]], [vsite_increments[1]]])
+
+        # charge adjustment
+        charge_adjustment = (
+            assignment_matrix @ trainable_vsite + objective_term.vsite_fixed_charges
+        )
+        atom_adjustment = charge_adjustment[:n_atoms]
+        vsite_charges = charge_adjustment[n_atoms:]
+
+        final_atom_charges = atom_charges + atom_adjustment
+        all_charges = np.vstack([final_atom_charges, vsite_charges])
+        total_charge = all_charges.sum()
+
+        assert np.isclose(
+            total_charge, 0.0, atol=1e-10
+        ), f"Total charge should be 0 (formal charge), got {total_charge}"
+
+    @pytest.mark.parametrize(
+        "molecule_name,smirks,n_atoms,n_vsites",
+        [
+            ("methanol", "[#6:1]-[#8:2]", 6, 1),  # BondCharge on C-O
+            ("water", "[#8:1]-[#1:2]", 3, 2),  # BondCharge on O-H (2 matches)
+        ],
+    )
+    def test_predict_molecules(
+        self, molecule_name, smirks, n_atoms, n_vsites, meoh_gdma_sto3g
+    ):
+        """Parametrized test for predict() across different molecules.
+
+        Tests both methanol (C-O bond) and water (O-H bonds) following
+        the openff-recharge vsite test patterns.
+        """
+        from openff.recharge.charges.vsite import (
+            BondChargeSiteParameter,
+            VirtualSiteCollection,
+        )
+
+        if molecule_name == "methanol":
+            gdma_record = meoh_gdma_sto3g
+        elif molecule_name == "water":
+            gdma_record = _make_water_record(RADIUS_LARGE)
+        else:
+            raise ValueError(f"Unknown molecule: {molecule_name}")
+
+        vsite_collection = VirtualSiteCollection(
+            parameters=[
+                BondChargeSiteParameter(
+                    smirks=smirks,
+                    name="EP",
+                    distance=0.5,
+                    charge_increments=(0.1, 0.1),
+                    sigma=0.0,
+                    epsilon=0.0,
+                    match="all-permutations",
+                )
+            ]
+        )
+        vsite_coord_keys = [(smirks, "BondCharge", "EP", "distance")]
+
+        objective_term, metadata = next(
+            MPFITObjective.compute_objective_terms(
+                [gdma_record],
+                vsite_collection=vsite_collection,
+                _vsite_coordinate_parameter_keys=vsite_coord_keys,
+                return_quse_masks=True,
+            )
+        )
+
+        assert metadata["n_vsites"] == n_vsites
+        assert objective_term.reference_values.shape[0] == n_atoms
+
+        charge_params = torch.ones((n_atoms, 1), dtype=torch.float64) * 0.1
+        pred = objective_term.predict(
+            charge_params, torch.tensor([[0.5]] * n_vsites, dtype=torch.float64)
+        )
+
+        assert len(pred) == n_atoms
+
+        # Test predictions change with different distances
+        pred2 = objective_term.predict(
+            charge_params, torch.tensor([[1.0]] * n_vsites, dtype=torch.float64)
+        )
+
+        predictions_differ = any(
+            not np.isclose(p1.detach().numpy().sum(), p2.detach().numpy().sum())
+            for p1, p2 in zip(pred, pred2, strict=False)
+        )
+        assert predictions_differ, "Predictions should differ at different distances"
