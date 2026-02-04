@@ -161,6 +161,49 @@ class MPFITObjectiveTerm(ObjectiveTerm):
 
         return predictions
 
+    def predict_from_free_charges(
+        self,
+        free_charges: "torch.Tensor",
+        vsite_charge_increments: "torch.Tensor",
+        vsite_coordinate_parameters: "torch.Tensor | None" = None,
+        formal_charge: float = 0.0,
+    ) -> list["torch.Tensor"]:
+        """Predict multipoles with automatic charge conservation.
+
+        A convenience wrapper around ``predict()`` that enforces total charge
+        conservation. Users provide N-1 free atom charges and this method
+        computes the constrained last charge to satisfy the formal charge.
+
+        Parameters
+        ----------
+        free_charges : torch.Tensor
+            Free charge parameters with shape (n_atoms - 1, 1).
+        vsite_charge_increments : torch.Tensor
+            Virtual site charge increments with shape (n_vsite_charges, 1).
+        vsite_coordinate_parameters : torch.Tensor, optional
+            Virtual site local frame coordinates being sampled.
+        formal_charge : float
+            Total molecular charge (default 0.0 for neutral molecules).
+
+        Returns
+        -------
+        list[torch.Tensor]
+            Predicted multipole contributions for each atom site.
+        """
+        try:
+            import torch
+        except ImportError:
+            raise ImportError(
+                "predict_from_free_charges() requires PyTorch. "
+                "Install with: pip install torch"
+            ) from None
+
+        last_charge = formal_charge - free_charges.sum(dim=0, keepdim=True)
+        atom_charges = torch.cat([free_charges, last_charge], dim=0)
+        charge_parameters = torch.cat([atom_charges, vsite_charge_increments], dim=0)
+
+        return self.predict(charge_parameters, vsite_coordinate_parameters)
+
 
 class MPFITObjective(Objective):
     """Compute contributions to the MPFIT least squares objective function.
