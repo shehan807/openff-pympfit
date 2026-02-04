@@ -2,20 +2,27 @@
 Installation
 ============
 
-PyMPFIT depends on `OpenFF <https://openforcefield.org/>`_ packages which are distributed via conda-forge.
+Dependencies
+------------
+
+PyMPFIT depends on `OpenFF <https://openforcefield.org/>`_ packages and
+`Psi4 <https://psicode.org/>`_/`GDMA <https://github.com/psi4/gdma>`_,
+which are distributed via conda-forge. *Works with conda, mamba, or micromamba.*
 
 .. code-block:: bash
 
-   conda create -n pympfit python=3.12 openff-recharge openff-utilities psi4 pygdma -c conda-forge -y
+   conda create -n pympfit python=3.12 openff-recharge openff-interchange openff-utilities psi4 pygdma -c conda-forge -y
    conda activate pympfit
+
+Install
+-------
+
+.. code-block:: bash
+
    pip install pympfit
 
-*Works with conda, mamba, or micromamba.*
-
-Bayesian Virtual Site Fitting
------------------------------
-
-For Bayesian optimization of virtual site parameters:
+Optional: Bayesian Virtual Site Fitting
+---------------------------------------
 
 .. code-block:: bash
 
@@ -24,12 +31,8 @@ For Bayesian optimization of virtual site parameters:
 Development Installation
 ------------------------
 
-For development or to get the latest changes:
-
 .. code-block:: bash
 
-   conda create -n pympfit-dev python=3.12 openff-recharge openff-utilities psi4 pygdma -c conda-forge -y
-   conda activate pympfit-dev
    git clone https://github.com/shehan807/pympfit.git
    cd pympfit
    pip install -e ".[test]"

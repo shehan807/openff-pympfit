@@ -2,9 +2,12 @@
 
 <img src="docs/_static/pympfit_logo.png" alt="PyMPFIT" width="400">
 
+[![PyPI version](https://img.shields.io/pypi/v/pympfit.svg)](https://pypi.org/project/pympfit/)
 [![GitHub Actions Build Status](https://github.com/shehan807/pympfit/actions/workflows/ci.yaml/badge.svg)](https://github.com/shehan807/pympfit/actions/workflows/ci.yaml)
 [![codecov](https://codecov.io/gh/shehan807/pympfit/branch/main/graph/badge.svg)](https://codecov.io/gh/shehan807/pympfit)
 [![Documentation Status](https://readthedocs.org/projects/pympfit/badge/?version=latest)](https://pympfit.readthedocs.io/en/latest/?badge=latest)
+
+[Documentation](https://pympfit.readthedocs.io/) | [PyPI](https://pypi.org/project/pympfit/) | [GitHub](https://github.com/shehan807/pympfit)
 
 </div>
 
@@ -18,17 +21,22 @@ PyMPFIT is a free, open-source software for performing partial atomic charge fit
 
 ## Installation
 
-PyMPFIT depends on [OpenFF](https://openforcefield.org/) packages which are distributed via conda-forge.
+### Dependencies
+
+PyMPFIT depends on [OpenFF](https://openforcefield.org/) packages and [Psi4](https://psicode.org/)/[GDMA](https://github.com/psi4/gdma), which are distributed via conda-forge. *Works with conda, mamba, or micromamba.*
 
 ```bash
 conda create -n pympfit python=3.12 openff-recharge openff-interchange openff-utilities psi4 pygdma -c conda-forge -y
 conda activate pympfit
+```
+
+### Install
+
+```bash
 pip install pympfit
 ```
 
-### Bayesian Virtual Site Fitting
-
-For Bayesian optimization of virtual site parameters:
+### Optional: Bayesian Virtual Site Fitting
 
 ```bash
 pip install pyro-ppl arviz matplotlib sphericart-torch
@@ -37,14 +45,10 @@ pip install pyro-ppl arviz matplotlib sphericart-torch
 ### Development Installation
 
 ```bash
-conda create -n pympfit-dev python=3.12 openff-recharge openff-interchange openff-utilities psi4 pygdma -c conda-forge -y
-conda activate pympfit-dev
 git clone https://github.com/shehan807/pympfit.git
 cd pympfit
 pip install -e ".[test]"
 ```
-
-*Works with conda, mamba, or micromamba.*
 
 ## Quick Example
 
