@@ -101,7 +101,7 @@ def _regular_solid_harmonic(
         elif m == 2 and cs == 0:
             val = 0.25 * np.sqrt(5.0) * (xn**2 - yn**2) * (6.0 * zn**2 - xn**2 - yn**2)
         elif m == 2 and cs == 1:
-            val = 0.25 * np.sqrt(5.0) * xn * yn * (6.0 * zn**2 - xn**2 - yn**2)
+            val = 0.50 * np.sqrt(5.0) * xn * yn * (6.0 * zn**2 - xn**2 - yn**2)
         elif m == 3 and cs == 0:
             val = 0.25 * np.sqrt(70.0) * zn * (xn**3 - 3.0 * xn * yn**2)
         elif m == 3 and cs == 1:
@@ -109,7 +109,7 @@ def _regular_solid_harmonic(
         elif m == 4 and cs == 0:
             val = 0.125 * np.sqrt(35.0) * (xn**4 - 6.0 * xn**2 * yn**2 + yn**4)
         elif m == 4 and cs == 1:
-            val = 0.125 * np.sqrt(35.0) * xn * yn * (xn**2 - yn**2)
+            val = 0.500 * np.sqrt(35.0) * xn * yn * (xn**2 - yn**2)
         else:
             val = np.zeros_like(rn)
         result[nonzero] = val
