@@ -6,8 +6,6 @@ from pympfit.mpfit.core import _regular_solid_harmonic, build_A_matrix, build_b_
 torch = pytest.importorskip("torch")
 sphericart = pytest.importorskip("sphericart")
 
-from pympfit.mpfit.core import build_A_matrix_torch
-
 
 class TestBuildAMatrix:
 
@@ -174,33 +172,38 @@ class TestBuildAMatrixTorch:
     @pytest.mark.parametrize("maxl", [0, 1, 2, 3, 4])
     def test_matches_numpy(self, maxl):
         """Test torch implementation matches numpy for all maxl values."""
+        from pympfit.mpfit.core import build_A_matrix_torch
+
         rng = np.random.default_rng(42)
         n_charges = 5
         xyzmult = rng.standard_normal((3, 3))
         xyzcharge = rng.standard_normal((n_charges, 3))
         r1, r2 = 0.5, 2.5
 
-        A_np = np.zeros((n_charges, n_charges))
-        build_A_matrix(0, xyzmult, xyzcharge, r1, r2, maxl, A_np)
+        a_mat_np = np.zeros((n_charges, n_charges))
+        build_A_matrix(0, xyzmult, xyzcharge, r1, r2, maxl, a_mat_np)
 
-        A_torch = build_A_matrix_torch(
-            0,
-            torch.from_numpy(xyzmult),
-            torch.from_numpy(xyzcharge),
-            r1, r2, maxl
-        ).detach().numpy()
+        a_mat_torch = (
+            build_A_matrix_torch(
+                0, torch.from_numpy(xyzmult), torch.from_numpy(xyzcharge), r1, r2, maxl
+            )
+            .detach()
+            .numpy()
+        )
 
-        assert np.allclose(A_np, A_torch, rtol=1e-10)
+        assert np.allclose(a_mat_np, a_mat_torch, rtol=1e-10)
 
     def test_gradients_flow_through(self):
         """Test that gradients can be computed through A matrix."""
+        from pympfit.mpfit.core import build_A_matrix_torch
+
         rng = np.random.default_rng(456)
         xyzmult = torch.from_numpy(rng.standard_normal((2, 3)))
         xyzcharge = torch.from_numpy(rng.standard_normal((4, 3)))
-        xyzcharge.requires_grad_(True)
+        xyzcharge.requires_grad_()
 
-        A = build_A_matrix_torch(0, xyzmult, xyzcharge, 0.5, 2.0, 2)
-        loss = A.sum()
+        a_mat = build_A_matrix_torch(0, xyzmult, xyzcharge, 0.5, 2.0, 2)
+        loss = a_mat.sum()
         loss.backward()
 
         assert xyzcharge.grad is not None

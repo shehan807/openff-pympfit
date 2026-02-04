@@ -278,8 +278,12 @@ class TestPredict:
         n_atoms = 6
         charge_params = torch.ones((n_atoms, 1), dtype=torch.float64) * 0.1
 
-        pred1 = objective_term.predict(charge_params, torch.tensor([[distance1]], dtype=torch.float64))
-        pred2 = objective_term.predict(charge_params, torch.tensor([[distance2]], dtype=torch.float64))
+        pred1 = objective_term.predict(
+            charge_params, torch.tensor([[distance1]], dtype=torch.float64)
+        )
+        pred2 = objective_term.predict(
+            charge_params, torch.tensor([[distance2]], dtype=torch.float64)
+        )
 
         # Number of predictions must match reference_values for loss() to work
         assert len(pred1) == len(pred2), (
@@ -314,7 +318,7 @@ class TestPredict:
 
         The vsite_charge_assignment_matrix encodes charge redistribution:
         when a vsite has charge, atoms bonded to it are adjusted to conserve
-        total molecular charge. 
+        total molecular charge.
         """
         from openff.recharge.charges.vsite import (
             BondChargeSiteParameter,
@@ -364,13 +368,12 @@ class TestPredict:
             fixed_charges_sum, 0.0, atol=1e-10
         ), f"Fixed charges should sum to 0, got {fixed_charges_sum}"
 
-        # verify actual charges sum to formal charge 
+        # verify actual charges sum to formal charge
         n_atoms = 6
         atom_charges = np.array([[0.1], [-0.2], [0.05], [0.05], [0.0], [0.0]])
         trainable_vsite = np.array([[vsite_increments[0]], [vsite_increments[1]]])
-        charge_params = np.vstack([atom_charges, trainable_vsite])
 
-        # charge adjustment 
+        # charge adjustment
         charge_adjustment = (
             assignment_matrix @ trainable_vsite + objective_term.vsite_fixed_charges
         )
@@ -440,12 +443,16 @@ class TestPredict:
         assert objective_term.reference_values.shape[0] == n_atoms
 
         charge_params = torch.ones((n_atoms, 1), dtype=torch.float64) * 0.1
-        pred = objective_term.predict(charge_params, torch.tensor([[0.5]] * n_vsites, dtype=torch.float64))
+        pred = objective_term.predict(
+            charge_params, torch.tensor([[0.5]] * n_vsites, dtype=torch.float64)
+        )
 
         assert len(pred) == n_atoms
 
         # Test predictions change with different distances
-        pred2 = objective_term.predict(charge_params, torch.tensor([[1.0]] * n_vsites, dtype=torch.float64))
+        pred2 = objective_term.predict(
+            charge_params, torch.tensor([[1.0]] * n_vsites, dtype=torch.float64)
+        )
 
         predictions_differ = any(
             not np.isclose(p1.detach().numpy().sum(), p2.detach().numpy().sum())
