@@ -12,7 +12,6 @@ which are distributed via conda-forge. *Works with conda, mamba, or micromamba.*
 .. code-block:: bash
 
    conda create -n pympfit python=3.12 openff-recharge openff-interchange openff-utilities psi4 pygdma -c conda-forge -y
-   conda activate pympfit
 
 Install
 -------
