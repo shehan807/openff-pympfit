@@ -137,3 +137,4 @@ timer.dat
 
 # Psi4 temporary files
 psi.*.clean
+tmp.py

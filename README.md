@@ -25,6 +25,8 @@ git clone https://github.com/shehan807/openff-pympfit.git
 cd openff-pympfit
 conda install -c conda-forge openff-recharge # no pip package for openff-recharge
 pip install -e .
+# Docs - Optional
+conda install sphinx
 ```
 
 **Note:** GDMA functionality requires Psi4 and PyGDMA:
