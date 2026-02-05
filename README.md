@@ -27,7 +27,6 @@ PyMPFIT depends on [OpenFF](https://openforcefield.org/) packages and [Psi4](htt
 
 ```bash
 conda create -n pympfit python=3.12 openff-recharge openff-interchange openff-utilities psi4 pygdma -c conda-forge -y
-conda activate pympfit
 ```
 
 ### Install
