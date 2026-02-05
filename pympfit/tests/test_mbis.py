@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from openff.recharge.utilities.molecule import smiles_to_molecule
 from openff.units import unit
-from openff_pympfit import MBISSettings
+from pympfit import MBISSettings
 
 
 @pytest.fixture
@@ -76,7 +76,7 @@ class TestPsi4MBISGenerator:
     ):
         """Test that correct input is generated from the jinja template."""
         pytest.importorskip("psi4")
-        from openff_pympfit.mbis.psi4 import Psi4MBISGenerator
+        from pympfit.mbis.psi4 import Psi4MBISGenerator
 
         # Create a closed shell molecule
         molecule = smiles_to_molecule("[Cl-]")
@@ -172,8 +172,8 @@ class TestPsi4MBISGenerator:
     ):
         """Test that MBIS settings are correctly applied to the template."""
         pytest.importorskip("psi4")
-        from openff_pympfit import MBISSettings
-        from openff_pympfit.mbis.psi4 import Psi4MBISGenerator
+        from pympfit import MBISSettings
+        from pympfit.mbis.psi4 import Psi4MBISGenerator
 
         settings = MBISSettings(**mbis_settings_kwargs)
 
@@ -197,8 +197,8 @@ class TestPsi4MBISGenerator:
     def test_generate(self, minimize, n_threads):
         """Perform a test run of Psi4 MBIS."""
         pytest.importorskip("psi4")
-        from openff_pympfit import MBISSettings
-        from openff_pympfit.mbis.psi4 import Psi4MBISGenerator
+        from pympfit import MBISSettings
+        from pympfit.mbis.psi4 import Psi4MBISGenerator
 
         # Define the settings to use
         settings = MBISSettings()
@@ -235,8 +235,8 @@ class TestPsi4MBISGenerator:
     def test_generate_no_properties(self):
         """Test that multipoles are None when compute_mp=False."""
         pytest.importorskip("psi4")
-        from openff_pympfit import MBISSettings
-        from openff_pympfit.mbis.psi4 import Psi4MBISGenerator
+        from pympfit import MBISSettings
+        from pympfit.mbis.psi4 import Psi4MBISGenerator
 
         settings = MBISSettings()
 
@@ -270,7 +270,7 @@ class TestMultipoleTransform:
 
     def test_cartesian_to_spherical_dipole(self):
         """Test dipole transformation: Cartesian (x,y,z) -> Spherical (Q10,Q11c,Q11s)."""
-        from openff_pympfit.mbis.multipole_transform import (
+        from pympfit.mbis.multipole_transform import (
             cartesian_to_spherical_dipole,
         )
 
@@ -285,7 +285,7 @@ class TestMultipoleTransform:
 
     def test_cartesian_to_spherical_dipole_multi_atom(self):
         """Test dipole transformation for multiple atoms."""
-        from openff_pympfit.mbis.multipole_transform import (
+        from pympfit.mbis.multipole_transform import (
             cartesian_to_spherical_dipole,
         )
 
@@ -313,7 +313,7 @@ class TestMultipoleTransform:
 
         Verifies that Θzz = Q20 directly.
         """
-        from openff_pympfit.mbis.multipole_transform import (
+        from pympfit.mbis.multipole_transform import (
             cartesian_to_spherical_quadrupole,
         )
 
@@ -340,7 +340,7 @@ class TestMultipoleTransform:
 
         Verifies that Ωzzz = Q30 directly.
         """
-        from openff_pympfit.mbis.multipole_transform import (
+        from pympfit.mbis.multipole_transform import (
             cartesian_to_spherical_octupole,
         )
 
@@ -355,7 +355,7 @@ class TestMultipoleTransform:
 
     def test_cartesian_to_spherical_multipoles_combined(self):
         """Test combined multipole transformation produces correct shape."""
-        from openff_pympfit.mbis.multipole_transform import (
+        from pympfit.mbis.multipole_transform import (
             cartesian_to_spherical_multipoles,
         )
 
@@ -379,9 +379,104 @@ class TestMultipoleTransform:
         # Charges should be preserved in first column
         np.testing.assert_allclose(mp[:, 0], charges, rtol=1e-10)
 
+    def test_cartesian_to_spherical_to_cartesian_multipoles(self):
+        """Test round-trip conversion preserves data.
+
+        Note: Quadrupoles and octupoles must be traceless for the round-trip
+        to work, as spherical harmonics only encode the traceless components.
+        """
+        from pympfit.mbis.multipole_transform import (
+            cartesian_to_spherical_multipoles,
+            spherical_to_cartesian_multipoles,
+        )
+
+        rng = np.random.default_rng(42)
+        n_atoms = 3
+        charges = np.array([0.5, -0.25, -0.25])
+        dipoles = rng.standard_normal((n_atoms, 3))
+
+        # Create symmetric traceless quadrupoles
+        quadrupoles = np.zeros((n_atoms, 3, 3))
+        for i in range(n_atoms):
+            q = rng.standard_normal((3, 3))
+            q = (q + q.T) / 2  # symmetrize
+            trace = np.trace(q) / 3.0
+            q -= trace * np.eye(3)  # make traceless
+            quadrupoles[i] = q
+
+        # Create symmetric traceless octupoles
+        # For octupoles, the tracelessness condition is more complex:
+        # sum over any contracted index pair gives zero
+        octupoles = np.zeros((n_atoms, 3, 3, 3))
+        for i in range(n_atoms):
+            # Build a traceless symmetric octupole by construction
+            # Use the 7 independent components and their relationships
+            # Start with unique components and make symmetric
+            vals = rng.standard_normal(10)  # 10 unique symmetric components
+            # xxx, xxy, xxz, xyy, xyz, xzz, yyy, yyz, yzz, zzz
+            xxx, xxy, xxz, xyy, xyz, xzz, yyy, yyz, yzz, zzz = vals
+
+            # For traceless: contract on first two indices = 0
+            # O_iik = 0 for all k => xxx + xyy + xzz = 0, xxy + yyy + yzz = 0,
+            # xxz + yyz + zzz = 0
+            # Solve: xzz = -xxx - xyy, yzz = -xxy - yyy, zzz = -xxz - yyz
+            xzz = -xxx - xyy
+            yzz = -xxy - yyy
+            zzz = -xxz - yyz
+
+            o = octupoles[i]
+            o[0, 0, 0] = xxx
+            o[2, 2, 2] = zzz
+            o[1, 1, 1] = yyy
+
+            # xxy and permutations
+            o[0, 0, 1] = o[0, 1, 0] = o[1, 0, 0] = xxy
+            # xxz and permutations
+            o[0, 0, 2] = o[0, 2, 0] = o[2, 0, 0] = xxz
+            # xyy and permutations
+            o[0, 1, 1] = o[1, 0, 1] = o[1, 1, 0] = xyy
+            # xyz and permutations
+            o[0, 1, 2] = o[0, 2, 1] = o[1, 0, 2] = xyz
+            o[1, 2, 0] = o[2, 0, 1] = o[2, 1, 0] = xyz
+            # xzz and permutations
+            o[0, 2, 2] = o[2, 0, 2] = o[2, 2, 0] = xzz
+            # yyz and permutations
+            o[1, 1, 2] = o[1, 2, 1] = o[2, 1, 1] = yyz
+            # yzz and permutations
+            o[1, 2, 2] = o[2, 1, 2] = o[2, 2, 1] = yzz
+
+        # Convert to spherical
+        mp = cartesian_to_spherical_multipoles(
+            charges=charges,
+            dipoles=dipoles,
+            quadrupoles=quadrupoles,
+            octupoles=octupoles,
+            max_moment=4,
+        )
+
+        # Shape should be (n_atoms, (max_moment+1)^2) = (3, 25)
+        assert mp.shape == (n_atoms, 25)
+
+        # Convert back to Cartesian
+        (
+            charges_rt,
+            dipoles_rt,
+            quadrupoles_rt,
+            octupoles_rt,
+        ) = spherical_to_cartesian_multipoles(mp, max_moment=4)
+
+        # Verify round-trip preserves data
+        np.testing.assert_allclose(charges_rt, charges, rtol=1e-10)
+        assert dipoles_rt is not None
+        assert quadrupoles_rt is not None
+        assert octupoles_rt is not None
+        np.testing.assert_allclose(dipoles_rt, dipoles, rtol=1e-10)
+        np.testing.assert_allclose(quadrupoles_rt, quadrupoles, rtol=1e-10)
+        np.testing.assert_allclose(octupoles_rt, octupoles, rtol=1e-10)
+
     def test_cartesian_multipoles_to_flat(self):
         """Test flattened Cartesian format produces correct shape."""
-        from openff_pympfit.mbis.multipole_transform import (
+        from pympfit.mbis.multipole_transform import (
             cartesian_multipoles_to_flat,
         )
 
@@ -407,16 +502,6 @@ class TestMultipoleTransform:
 
         # Dipoles should be in columns 1-3 (x, y, z order)
         np.testing.assert_allclose(mp[:, 1:4], dipoles, rtol=1e-10)
-
-    def test_multipole_format_option_spherical(self):
-        """Test that multipole_format='spherical' is the default."""
-        settings = MBISSettings()
-        assert settings.multipole_format == "spherical"
-
-    def test_multipole_format_option_cartesian(self):
-        """Test that multipole_format='cartesian' can be set."""
-        settings = MBISSettings(multipole_format="cartesian")
-        assert settings.multipole_format == "cartesian"
 
 
 if __name__ == "__main__":

@@ -255,6 +255,264 @@ def cartesian_to_spherical_multipoles(
     return multipoles
 
 
+def spherical_to_cartesian_dipole(
+    mu_sph: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Convert spherical harmonic dipole to Cartesian.
+
+    Parameters
+    ----------
+    mu_sph
+        Spherical harmonic dipole array of shape (N, 3).
+        Order: [Q10, Q11c, Q11s] = [z, x, y]
+
+    Returns
+    -------
+    NDArray[np.float64]
+        Cartesian dipole array of shape (N, 3) where columns are [x, y, z].
+    """
+    n_atoms = mu_sph.shape[0]
+    cartesian = np.zeros((n_atoms, 3))
+
+    # Q10 = μz  =>  μz = Q10
+    # Q11c = μx =>  μx = Q11c
+    # Q11s = μy =>  μy = Q11s
+    cartesian[:, 0] = mu_sph[:, 1]  # μx = Q11c
+    cartesian[:, 1] = mu_sph[:, 2]  # μy = Q11s
+    cartesian[:, 2] = mu_sph[:, 0]  # μz = Q10
+
+    return cartesian
+
+
+def spherical_to_cartesian_quadrupole(
+    q_sph: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Convert spherical harmonic quadrupole to Cartesian.
+
+    The transformation uses:
+        Theta_xx = -1/2 Q20 + 1/2 sqrt(3) Q22c
+        Theta_yy = -1/2 Q20 - 1/2 sqrt(3) Q22c
+        Theta_zz = Q20
+        Theta_xy = 1/(2*sqrt(3)) Q22s
+        Theta_xz = 1/(2*sqrt(3)) Q21c
+        Theta_yz = 1/(2*sqrt(3)) Q21s
+
+    Parameters
+    ----------
+    q_sph
+        Spherical harmonic quadrupole array of shape (N, 5).
+        Order: [Q20, Q21c, Q21s, Q22c, Q22s]
+
+    Returns
+    -------
+    NDArray[np.float64]
+        Cartesian quadrupole tensor of shape (N, 3, 3).
+    """
+    n_atoms = q_sph.shape[0]
+    theta = np.zeros((n_atoms, 3, 3))
+
+    sqrt3 = np.sqrt(3.0)
+
+    for i in range(n_atoms):
+        q20 = q_sph[i, 0]
+        q21c = q_sph[i, 1]
+        q21s = q_sph[i, 2]
+        q22c = q_sph[i, 3]
+        q22s = q_sph[i, 4]
+
+        # Theta_zz = Q20
+        zz = q20
+
+        # Theta_xz = 1/(2*sqrt(3)) Q21c
+        xz = q21c / (2.0 * sqrt3)
+
+        # Theta_yz = 1/(2*sqrt(3)) Q21s
+        yz = q21s / (2.0 * sqrt3)
+
+        # Theta_xy = 1/(2*sqrt(3)) Q22s
+        xy = q22s / (2.0 * sqrt3)
+
+        # Theta_xx = -1/2 Q20 + 1/2 sqrt(3) Q22c
+        xx = -0.5 * q20 + 0.5 * sqrt3 * q22c
+
+        # Theta_yy = -1/2 Q20 - 1/2 sqrt(3) Q22c
+        yy = -0.5 * q20 - 0.5 * sqrt3 * q22c
+
+        theta[i, 0, 0] = xx
+        theta[i, 1, 1] = yy
+        theta[i, 2, 2] = zz
+        theta[i, 0, 1] = theta[i, 1, 0] = xy
+        theta[i, 0, 2] = theta[i, 2, 0] = xz
+        theta[i, 1, 2] = theta[i, 2, 1] = yz
+
+    return theta
+
+
+def spherical_to_cartesian_octupole(
+    o_sph: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Convert spherical harmonic octupole to Cartesian.
+
+    The transformation uses:
+        Omega_xxx = sqrt(5/8) Q33c - sqrt(3/8) Q31c
+        Omega_xxy = sqrt(5/8) Q33s - sqrt(1/24) Q31s
+        Omega_xyy = -sqrt(5/8) Q33c - sqrt(1/24) Q31c
+        Omega_yyy = -sqrt(5/8) Q33s - sqrt(3/8) Q31s
+        Omega_xxz = sqrt(5/12) Q32c - 1/2 Q30
+        Omega_xyz = sqrt(5/12) Q32s
+        Omega_yyz = -sqrt(5/12) Q32c - 1/2 Q30
+        Omega_xzz = sqrt(2/3) Q31c
+        Omega_yzz = sqrt(2/3) Q31s
+        Omega_zzz = Q30
+
+    Parameters
+    ----------
+    o_sph
+        Spherical harmonic octupole array of shape (N, 7).
+        Order: [Q30, Q31c, Q31s, Q32c, Q32s, Q33c, Q33s]
+
+    Returns
+    -------
+    NDArray[np.float64]
+        Cartesian octupole tensor of shape (N, 3, 3, 3).
+    """
+    n_atoms = o_sph.shape[0]
+    omega = np.zeros((n_atoms, 3, 3, 3))
+
+    sqrt_2_3 = np.sqrt(2.0 / 3.0)
+    sqrt_5_12 = np.sqrt(5.0 / 12.0)
+    sqrt_5_8 = np.sqrt(5.0 / 8.0)
+    sqrt_3_8 = np.sqrt(3.0 / 8.0)
+    sqrt_1_24 = np.sqrt(1.0 / 24.0)
+
+    for i in range(n_atoms):
+        q30 = o_sph[i, 0]
+        q31c = o_sph[i, 1]
+        q31s = o_sph[i, 2]
+        q32c = o_sph[i, 3]
+        q32s = o_sph[i, 4]
+        q33c = o_sph[i, 5]
+        q33s = o_sph[i, 6]
+
+        # Omega_zzz = Q30
+        zzz = q30
+
+        # Omega_xzz = sqrt(2/3) Q31c
+        xzz = sqrt_2_3 * q31c
+
+        # Omega_yzz = sqrt(2/3) Q31s
+        yzz = sqrt_2_3 * q31s
+
+        # Omega_xxz = sqrt(5/12) Q32c - 1/2 Q30
+        xxz = sqrt_5_12 * q32c - 0.5 * q30
+
+        # Omega_yyz = -sqrt(5/12) Q32c - 1/2 Q30
+        yyz = -sqrt_5_12 * q32c - 0.5 * q30
+
+        # Omega_xyz = sqrt(5/12) Q32s
+        xyz = sqrt_5_12 * q32s
+
+        # Omega_xxx = sqrt(5/8) Q33c - sqrt(3/8) Q31c
+        xxx = sqrt_5_8 * q33c - sqrt_3_8 * q31c
+
+        # Omega_yyy = -sqrt(5/8) Q33s - sqrt(3/8) Q31s
+        yyy = -sqrt_5_8 * q33s - sqrt_3_8 * q31s
+
+        # Omega_xxy = sqrt(5/8) Q33s - sqrt(1/24) Q31s
+        xxy = sqrt_5_8 * q33s - sqrt_1_24 * q31s
+
+        # Omega_xyy = -sqrt(5/8) Q33c - sqrt(1/24) Q31c
+        xyy = -sqrt_5_8 * q33c - sqrt_1_24 * q31c
+
+        # Fill in the symmetric tensor
+        omega[i, 0, 0, 0] = xxx
+        omega[i, 2, 2, 2] = zzz
+        omega[i, 1, 1, 1] = yyy
+
+        # xxy and permutations
+        omega[i, 0, 0, 1] = omega[i, 0, 1, 0] = omega[i, 1, 0, 0] = xxy
+
+        # xxz and permutations
+        omega[i, 0, 0, 2] = omega[i, 0, 2, 0] = omega[i, 2, 0, 0] = xxz
+
+        # xyy and permutations
+        omega[i, 0, 1, 1] = omega[i, 1, 0, 1] = omega[i, 1, 1, 0] = xyy
+
+        # xyz and permutations
+        omega[i, 0, 1, 2] = omega[i, 0, 2, 1] = omega[i, 1, 0, 2] = xyz
+        omega[i, 1, 2, 0] = omega[i, 2, 0, 1] = omega[i, 2, 1, 0] = xyz
+
+        # xzz and permutations
+        omega[i, 0, 2, 2] = omega[i, 2, 0, 2] = omega[i, 2, 2, 0] = xzz
+
+        # yyz and permutations
+        omega[i, 1, 1, 2] = omega[i, 1, 2, 1] = omega[i, 2, 1, 1] = yyz
+
+        # yzz and permutations
+        omega[i, 1, 2, 2] = omega[i, 2, 1, 2] = omega[i, 2, 2, 1] = yzz
+
+    return omega
+
+
+def spherical_to_cartesian_multipoles(
+    multipoles: NDArray[np.float64],
+    max_moment: int = 4,
+) -> tuple[
+    NDArray[np.float64],
+    NDArray[np.float64] | None,
+    NDArray[np.float64] | None,
+    NDArray[np.float64] | None,
+]:
+    """Convert spherical harmonic multipoles to Cartesian representation.
+
+    Parameters
+    ----------
+    multipoles
+        Spherical harmonic multipole array of shape (N, n_components)
+        where n_components = (max_moment + 1)^2.
+        Components are ordered as:
+        - l=0: Q00 (index 0)
+        - l=1: Q10, Q11c, Q11s (indices 1-3)
+        - l=2: Q20, Q21c, Q21s, Q22c, Q22s (indices 4-8)
+        - l=3: Q30, Q31c, Q31s, Q32c, Q32s, Q33c, Q33s (indices 9-15)
+    max_moment
+        Maximum multipole moment included in the input (1-4).
+
+    Returns
+    -------
+    tuple
+        A tuple of (charges, dipoles, quadrupoles, octupoles) where:
+        - charges: array of shape (N,)
+        - dipoles: array of shape (N, 3) or None if max_moment < 1
+        - quadrupoles: array of shape (N, 3, 3) or None if max_moment < 2
+        - octupoles: array of shape (N, 3, 3, 3) or None if max_moment < 3
+    """
+    n_atoms = multipoles.shape[0]
+
+    # l=0: Monopole (charge)
+    charges = multipoles[:, 0]
+
+    # l=1: Dipole
+    dipoles = None
+    if max_moment >= 1:
+        spherical_dipoles = multipoles[:, 1:4]
+        dipoles = spherical_to_cartesian_dipole(spherical_dipoles)
+
+    # l=2: Quadrupole
+    quadrupoles = None
+    if max_moment >= 2:
+        spherical_quadrupoles = multipoles[:, 4:9]
+        quadrupoles = spherical_to_cartesian_quadrupole(spherical_quadrupoles)
+
+    # l=3: Octupole
+    octupoles = None
+    if max_moment >= 3:
+        spherical_octupoles = multipoles[:, 9:16]
+        octupoles = spherical_to_cartesian_octupole(spherical_octupoles)
+
+    return charges, dipoles, quadrupoles, octupoles
+
+
 def cartesian_multipoles_to_flat(
     charges: NDArray[np.float64],
     dipoles: NDArray[np.float64] | None = None,
