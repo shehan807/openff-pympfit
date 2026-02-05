@@ -1,6 +1,6 @@
 # Theory
 
-**OpenFF-PyMPFIT** implements the MPFIT algorithm introduced by
+**PyMPFIT** implements the MPFIT algorithm introduced by
 [Ferenczy](https://onlinelibrary.wiley.com/doi/abs/10.1002/jcc.540120802) to
 calculate partial atomic charges that reproduce the electrostatic potential of a
 distributed multipole analysis. This is in contrast with traditional (e.g., RESP)
@@ -104,7 +104,7 @@ $$ (eq:regular_harmonic)
 This allows for simplification of the original equation to,
 
 $$
-f(r) = \sum_a\sum_{l,m}I_{lm}^a(r)[Q_{lm}^a - \sum_{i}q_{i}^{a}R_{lm}^{a}(r_i)] = \sum_{a}f^{a}(r)
+f(r) = \sum_a\sum_{l,m}I_{lm}^a[r](Q_{lm}^a - \sum_{i}q_{i}^{a}R_{lm}^{a}(r_i)) = \sum_{a}f^{a}(r)
 $$ (eq:simplified_potential)
 
 We can eliminate $I_{lm}^{a}(r)$ by integration. Namely, the integration of
@@ -181,7 +181,92 @@ $$ (eq:total_charge)
 
 ## Constrained MPFIT
 
-*Coming soon...*
+The unconstrained MPFIT objective $F = \sum_a F^a$ can be augmented with two
+classes of constraints for transferable force field development: atom-type
+equivalence and per-molecule charge conservation. When fitting across multiple
+molecules simultaneously, these constraints enable transferable charge sets
+where chemically equivalent atoms in different molecules carry identical charges.
+
+In the constrained formulation, each atom $i$ contributes a charge $q_i^a$ at
+each multipole site $a$ for which it is within the cutoff radius (the ``quse``
+mask). The total charge on atom $i$ is
+
+$$
+q_i = \sum_a q_i^a
+$$ (eq:total_charge_constrained)
+
+Rather than optimizing all $q_i^a$ directly, we work with a reduced parameter
+vector $\mathbf{p}$ that implicitly enforces atom-type equivalence.
+
+### Atom-Type Equivalence
+
+Atoms sharing the same type label are constrained to have equal total
+charges. Let $\mathcal{T}$ be a set of atoms sharing the same type, and
+let $i_1$ be the first atom in $\mathcal{T}$ (by index order). The
+reference total charge for the type is defined as the sum of $i_1$'s
+per-site charges, where each $q_{i_1}^a$ creates a free parameter in
+$\mathbf{p}$ for every contributing site (i.e., where
+$\text{quse}_{a,i_1} = 1$):
+
+$$
+q^{\text{total}}_{\mathcal{T}} = \sum_a q_{i_1}^a
+$$ (eq:type_reference_charge)
+
+For every subsequent atom $i \in \mathcal{T}$ ($i \neq i_1$), each
+contributing site also creates a free parameter in $\mathbf{p}$, except
+the last contributing site $a^*$ (in index order), which absorbs the
+difference needed to match the reference total:
+
+$$
+q_i^{a^_} = q^{\text{total}}_{\mathcal{T}} - \sum_{a \neq a^_} q_i^a
+$$ (eq:twin_constraint)
+
+The per-site charge distributions may differ between atoms in
+$\mathcal{T}$; only the totals are forced equal. If atom $i$ contributes
+to only one site, no free parameters are created and
+$q^{\text{total}}_{\mathcal{T}}$ is copied directly. This reduces the
+number of free parameters by one per subsequent atom in $\mathcal{T}$.
+The mapping from $\mathbf{p}$ to the full per-site charge matrix and
+total charges is performed by ``expandcharge``.
+
+### Constrained Objective Function
+
+The full constrained objective augments the unconstrained MPFIT objective
+(Equation {eq}`eq:F_optimization`) with a per-molecule charge conservation
+penalty:
+
+$$
+F_{\text{total}} = \underbrace{\sum_a F^a(\rho_1, \rho_2)}_{\text{multipole fit}} + \underbrace{\sum_{\text{mol}} \lambda \left(\sum_{i \in \text{mol}} q_i - Q_{\text{mol}}\right)^2}_{\text{charge conservation}}
+$$ (eq:constrained_objective)
+
+where $F^a(\rho_1, \rho_2)$ is defined in Equation {eq}`eq:F_optimization`.
+The parameter $\lambda$ (``conchg``) controls the strength of the charge
+conservation penalty. Larger values of $\lambda$ enforce stricter conservation
+at the cost of a slightly worse multipole fit. $Q_{\text{mol}}$ is the target
+total charge for each molecule (e.g., +1 for a cation, 0 for a neutral).
+
+The gradient of $F_{\text{total}}$ with respect to the full per-site charges
+has two contributions. The multipole fitting gradient
+$\partial F^a / \partial q_j^a$ follows directly from Equation
+{eq}`eq:F_derivative`. The charge conservation gradient for atom $j$ in
+molecule $m$ is
+
+$$
+\frac{\partial F_{\text{con}}}{\partial q_j} = 2\lambda\left(\sum_{i \in m} q_i - Q_m\right)
+$$ (eq:constrained_charge_gradient)
+
+The full-space gradient is then projected into the reduced parameter space
+via the chain rule through ``expandcharge``, yielding the gradient
+$\nabla_{\mathbf{p}} F_{\text{total}}$ passed to the optimizer.
+
+### Optimization
+
+The constrained objective is minimized using ``scipy.optimize.minimize``
+(L-BFGS-B by default) with the analytic Jacobian. The optimizer
+receives the reduced parameter vector $\mathbf{p}$, which is expanded to
+full charges for each function and gradient evaluation. After convergence,
+the optimal $\mathbf{p}$ is expanded one final time to obtain the total
+charge per atom $q_i$.
 
 ## Virtual Sites
 

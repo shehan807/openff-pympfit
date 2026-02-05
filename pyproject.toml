@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 # Self-descriptive entries which should always be present
 # https://packaging.python.org/en/latest/specifications/declaring-project-metadata/
 [project]
-name = "openff_pympfit"
+name = "pympfit"
 description = "Partial atomic charge assignment via multipole moment-based fitting algorithm"
 dynamic = ["version"]
 readme = "README.md"
@@ -26,8 +26,8 @@ dependencies = [
 ]
 
 [project.urls]
-"Source" = "https://github.com/shehan807/openff-pympfit"
-"Documentation" = "https://openff-pympfit.readthedocs.io/"
+"Source" = "https://github.com/shehan807/pympfit"
+"Documentation" = "https://pympfit.readthedocs.io/"
 
 [project.optional-dependencies]
 test = [
@@ -63,7 +63,7 @@ where = ["."]
 
 # Ref https://setuptools.pypa.io/en/latest/userguide/datafiles.html#package-data
 [tool.setuptools.package-data]
-openff_pympfit = [
+pympfit = [
     "py.typed",
     "data/**/*",
 ]
@@ -84,13 +84,13 @@ match = ["*"]
 default-tag = "1.0.0"
 
 [tool.versioningit.write]
-file = "openff_pympfit/_version.py"
+file = "pympfit/_version.py"
 
 [tool.ruff]
 target-version = "py310"
 output-format = "concise"
 line-length = 88
-exclude = ["openff_pympfit/_version.py"]
+exclude = ["pympfit/_version.py"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -129,7 +129,7 @@ ignore = [
     "SLF001",  # private member access (using internal _classes is fine in own codebase)
 ]
 pydocstyle.convention = "numpy"
-isort.known-first-party = ["openff_pympfit"]
+isort.known-first-party = ["pympfit"]
 isort.split-on-trailing-comma = false
 
 [tool.ruff.format]
@@ -137,27 +137,28 @@ docstring-code-format = true
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
-"**/tests/*" = ["ANN", "ARG001", "D", "INP001", "PLR2004", "S101"]
+"**/tests/*" = ["ANN", "ARG001", "D", "E741", "INP001", "PLR2004", "S101"]
 "docs/*" = ["INP001", "D100", "A001"]
 # Devtools: MolSSI cookiecutter template scripts
 "devtools/*" = ["ANN", "B904", "D", "E501", "INP001", "T201", "S602"]
 # Examples: demonstration scripts with intentional print
 "examples/*" = ["ANN", "D", "INP001", "T201"]
-# Legacy file: l is physics convention for angular momentum, print is intentional
-"openff_pympfit/mpfit/_legacy.py" = ["E741", "T201"]
-# Core math: l/m are quantum numbers, A/Y/W are standard physics notation
-"openff_pympfit/mpfit/core.py" = ["E741", "N802", "N803", "N806"]
+# Legacy files: l is physics convention for angular momentum, W is standard notation, print is intentional
+"pympfit/mpfit/_legacy.py" = ["E741", "T201"]
+"pympfit/mpfit/_legacy_constrained.py" = ["E741", "N806", "T201"]
+# Core math: l/m are quantum numbers, A/Y/W are standard physics notation, m used for loop indexing
+"pympfit/mpfit/core.py" = ["B007", "E741", "N802", "N803", "N806"]
 # Solvers: U/S/Vh are SVD notation, TRY301 raises in try are intentional
-"openff_pympfit/mpfit/solvers.py" = ["N806", "TRY301"]
+"pympfit/mpfit/solvers.py" = ["E741", "N806", "TRY301"]
 # Optimize: A_matrix/site_A/site_b are standard physics matrix notation
-"openff_pympfit/optimize/_optimize.py" = ["N806"]
+"pympfit/optimize/_optimize.py" = ["N806"]
 # Psi4: S607 partial executable path is intentional (psi4 expected in PATH)
-"openff_pympfit/gdma/psi4.py" = ["S607"]
+"pympfit/gdma/psi4.py" = ["S607"]
 
 [tool.coverage.run]
 omit = [
     "*/tests/*",
-    "openff_pympfit/_version.py",
+    "pympfit/_version.py",
 ]
 
 [tool.coverage.report]
@@ -175,8 +176,9 @@ warn_unused_configs = true
 warn_unused_ignores = true
 show_error_codes = true
 disable_error_code = ["call-arg"]
-exclude = ["openff_pympfit/tests/"]
+exclude = ["pympfit/tests/"]
 
 [tool.pytest.ini_options]
-testpaths = ["openff_pympfit/tests"]
-addopts = "-v --tb=short"
+testpaths = ["pympfit/tests"]
+addopts = "-v --tb=short -m 'not slow'"
+markers = ["slow: marks tests as slow (deselect with '-m \"not slow\"')"]

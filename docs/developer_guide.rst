@@ -1,4 +1,4 @@
 Developer Guide
 ===============
 
-This page details how to contribute to OpenFF PyMPFIT. 
+This page details how to contribute to PyMPFIT. 

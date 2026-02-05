@@ -7,8 +7,8 @@ on:
   pull_request:
     branches:
       - "main"
-  schedule:
-    - cron: "0 0 * * *"
+  # schedule:
+  #   - cron: "0 0 * * *"
 
 jobs:
   lint:
@@ -57,11 +57,19 @@ jobs:
           conda info
           conda list
 
-      - name: Run Tests
+      - name: Run Tests (fast)
+        if: github.event_name != 'pull_request'
         shell: bash -l {0}
         run: |
           python -c "from openff.toolkit import *"
-          pytest -x -n auto --cov=openff_pympfit openff_pympfit/tests/ --cov-report=xml
+          pytest -x -n auto -m "not slow" --cov=pympfit pympfit/tests/ --cov-report=xml
+
+      - name: Run Tests (full)
+        if: github.event_name == 'pull_request'
+        shell: bash -l {0}
+        run: |
+          python -c "from openff.toolkit import *"
+          pytest -x -n auto --cov=pympfit pympfit/tests/ --cov-report=xml
 
       - name: CodeCov
         uses: codecov/codecov-action@v5

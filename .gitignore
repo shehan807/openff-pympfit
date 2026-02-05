@@ -110,6 +110,7 @@ docs/ref/api/
 
 # Generated version file (versioningit)
 openff_pympfit/_version.py
+pympfit/_version.py
 
 # profraw files from LLVM? Unclear exactly what triggers this
 # There are reports this comes from LLVM profiling, but also Xcode 9.
@@ -126,6 +127,11 @@ spice-gdma.log
 *.npy 
 *.pkl 
 *.sqlite 
+*.npy
+!pympfit/tests/data/esp/*.npy
+*.pkl 
+*.sqlite
+!pympfit/tests/data/gdma/*.sqlite
 *.hdf5
 *.h5py
 

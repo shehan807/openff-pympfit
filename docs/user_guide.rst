@@ -1,7 +1,7 @@
 User Guide
 ==========
 
-This guide covers the main components and workflows in OpenFF PyMPFIT.
+This guide covers the main components and workflows in PyMPFIT.
 
 GDMA Settings
 -------------
@@ -11,7 +11,7 @@ distributed multipole analysis.
 
 .. code-block:: python
 
-    from openff_pympfit import GDMASettings
+    from pympfit import GDMASettings
 
     settings = GDMASettings(
         basis="aug-cc-pvdz",      # Basis set
@@ -30,7 +30,7 @@ MPFIT can average over multiple conformers for more robust charge fitting.
 
     from openff.toolkit import Molecule
     from openff.recharge.utilities.molecule import extract_conformers
-    from openff_pympfit import (
+    from pympfit import (
         generate_mpfit_charge_parameter,
         GDMASettings,
         Psi4GDMAGenerator,
@@ -60,7 +60,7 @@ Use ``MoleculeGDMAStore`` to persist GDMA data to a SQLite database.
 
 .. code-block:: python
 
-    from openff_pympfit.gdma.storage import MoleculeGDMAStore
+    from pympfit.gdma.storage import MoleculeGDMAStore
 
     # Create or open a store
     store = MoleculeGDMAStore("gdma_data.sqlite")
@@ -79,7 +79,7 @@ MPFIT uses SVD (Singular Value Decomposition) to solve the per-site fitting prob
 
 .. code-block:: python
 
-    from openff_pympfit import MPFITSVDSolver
+    from pympfit import MPFITSVDSolver
 
     # Default solver with default threshold
     solver = MPFITSVDSolver()

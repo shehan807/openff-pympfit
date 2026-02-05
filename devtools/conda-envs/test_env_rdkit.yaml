@@ -1,4 +1,4 @@
-name: openff-pympfit-test-rdkit
+name: pympfit-test-rdkit
 channels:
   - conda-forge
 dependencies:
@@ -35,6 +35,13 @@ dependencies:
 
   # Optimization
   - pytorch
+
+  # Bayesian virtual site fitting
+  - pyro-ppl
+  - arviz
+  - matplotlib
+  - pip:
+    - sphericart-torch
 
     # Testing
   - pytest

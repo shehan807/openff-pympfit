@@ -29,9 +29,13 @@
 Introduction
 ============
 
-**OpenFF PyMPFIT** is a Python implementation of the Multipole Fitting (MPFIT)
+`Documentation <https://pympfit.readthedocs.io/>`_ |
+`PyPI <https://pypi.org/project/pympfit/>`_ |
+`GitHub <https://github.com/shehan807/pympfit>`_
+
+**PyMPFIT** is a Python implementation of the Multipole Fitting (MPFIT)
 algorithm for deriving partial atomic charges from Gaussian distributed multipole
-moments. **OpenFF PyMPFIT**, originally a fork of
+moments. **PyMPFIT**, originally a fork of
 `openff-recharge <https://github.com/openforcefield/openff-recharge>`_, is built
 upon open-source libraries, including
 `OpenFF Recharge <https://github.com/openforcefield/openff-recharge>`_ and

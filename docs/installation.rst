@@ -2,38 +2,37 @@
 Installation
 ============
 
-From pip
---------
+Dependencies
+------------
+
+PyMPFIT depends on `OpenFF <https://openforcefield.org/>`_ packages and
+`Psi4 <https://psicode.org/>`_/`GDMA <https://github.com/psi4/gdma>`_,
+which are distributed via conda-forge. *Works with conda, mamba, or micromamba.*
 
 .. code-block:: bash
 
-   pip install openff-pympfit
+   conda create -n pympfit python=3.12 openff-recharge openff-interchange openff-utilities psi4 pygdma -c conda-forge -y
+   conda activate pympfit
 
-From source
------------
-
-For development or to get the latest changes:
-
-.. code-block:: bash
-
-   git clone https://github.com/openforcefield/openff-pympfit.git
-   cd openff-pympfit
-
-   # Create conda environment with all dependencies
-   conda env create -f devtools/conda-envs/test_env_rdkit.yaml
-   conda activate openff-pympfit-test-rdkit
-
-   # Install in editable mode
-   pip install -e .
-
-Psi4 and GDMA
--------------
-
-GDMA functionality requires `Psi4 <https://psicode.org/>`_ and
-`PyGDMA <https://github.com/psi4/gdma>`_, which must be installed via conda:
+Install
+-------
 
 .. code-block:: bash
 
-   conda install -c psi4 psi4 pygdma
+   pip install pympfit
 
-This is required for both pip and source installations.
+Optional: Bayesian Virtual Site Fitting
+---------------------------------------
+
+.. code-block:: bash
+
+   pip install pyro-ppl arviz matplotlib sphericart-torch
+
+Development Installation
+------------------------
+
+.. code-block:: bash
+
+   git clone https://github.com/shehan807/pympfit.git
+   cd pympfit
+   pip install -e ".[test]"
