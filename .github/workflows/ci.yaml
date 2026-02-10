@@ -48,7 +48,7 @@ jobs:
       - name: Install Package
         shell: bash -l {0}
         run: |
-          micromamba install psi4 pygdma -c conda-forge -y
+          micromamba install psi4 libint=2.9 pygdma -c conda-forge -y
           python -m pip install -e .
 
       - name: Conda Environment Information
