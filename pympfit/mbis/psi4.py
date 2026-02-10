@@ -11,8 +11,8 @@ from openff.units import Quantity, unit
 from openff.units.elements import SYMBOLS
 from openff.utilities import get_data_file_path, temporary_cd
 
-from openff_pympfit.mbis import MBISGenerator, MBISSettings
-from openff_pympfit.mbis.multipole_transform import (
+from pympfit.mbis import MBISGenerator, MBISSettings
+from pympfit.mbis.multipole_transform import (
     cartesian_multipoles_to_flat,
     cartesian_to_spherical_multipoles,
 )
@@ -81,7 +81,7 @@ class Psi4MBISGenerator(MBISGenerator):
 
         # Format the jinja template
         template_path = get_data_file_path(
-            os.path.join("psi4", "mbis.dat"), "openff_pympfit"
+            os.path.join("psi4", "mbis.dat"), "pympfit"
         )
 
         with open(template_path) as file:

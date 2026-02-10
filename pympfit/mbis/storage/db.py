@@ -14,7 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Query, Session, declarative_base, relationship
 
-from openff_pympfit.mbis import MBISSettings
+from pympfit.mbis import MBISSettings
 
 DBBase = declarative_base()
 

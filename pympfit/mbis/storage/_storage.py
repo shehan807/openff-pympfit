@@ -11,9 +11,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
-from openff_pympfit._annotations import MP, Coordinates
-from openff_pympfit.mbis import MBISSettings
-from openff_pympfit.mbis.storage.db import (
+from pympfit._annotations import MP, Coordinates
+from pympfit.mbis import MBISSettings
+from pympfit.mbis.storage.db import (
     DB_VERSION,
     DBBase,
     DBConformerRecord,
@@ -23,7 +23,7 @@ from openff_pympfit.mbis.storage.db import (
     DBMoleculeRecord,
     DBSoftwareProvenance,
 )
-from openff_pympfit.mbis.storage.exceptions import IncompatibleDBVersion
+from pympfit.mbis.storage.exceptions import IncompatibleDBVersion
 
 
 class MoleculeMBISRecord(BaseModel):
