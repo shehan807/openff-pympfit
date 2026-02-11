@@ -80,9 +80,7 @@ class Psi4MBISGenerator(MBISGenerator):
         ]
 
         # Format the jinja template
-        template_path = get_data_file_path(
-            os.path.join("psi4", "mbis.dat"), "pympfit"
-        )
+        template_path = get_data_file_path(os.path.join("psi4", "mbis.dat"), "pympfit")
 
         with open(template_path) as file:
             template = jinja2.Template(file.read())
@@ -162,7 +160,7 @@ class Psi4MBISGenerator(MBISGenerator):
             if compute_mp:
                 # Load MBIS Cartesian multipoles from Psi4 output files
                 mbis_charges = np.load("mbis_charges.npy").flatten()
-                max_moment = settings.max_radial_moment
+                max_moment = settings.max_moment
 
                 # Load dipoles if available
                 mbis_dipoles = None

@@ -603,3 +603,95 @@ def cartesian_multipoles_to_flat(
             multipoles[i, idx + 9] = o[2, 2, 2]  # zzz
 
     return multipoles
+
+
+def flat_to_cartesian_multipoles(
+    multipoles: NDArray[np.float64],
+    max_moment: int = 4,
+) -> tuple[
+    NDArray[np.float64],
+    NDArray[np.float64] | None,
+    NDArray[np.float64] | None,
+    NDArray[np.float64] | None,
+]:
+    """Unflatten Cartesian multipoles from a 2D array back to tensor form.
+
+    This is the inverse of cartesian_multipoles_to_flat.
+
+    Parameters
+    ----------
+    multipoles
+        Flattened Cartesian multipole array of shape (N, n_components).
+        Components for each rank are stored in the following order:
+        - l=0: q (1 component, index 0)
+        - l=1: x, y, z (3 components, indices 1-3)
+        - l=2: xx, xy, xz, yy, yz, zz (6 components, indices 4-9)
+        - l=3: xxx, xxy, xxz, xyy, xyz, xzz, yyy, yyz, yzz, zzz
+               (10 components, indices 10-19)
+    max_moment
+        Maximum multipole moment included in the input (0-3).
+
+    Returns
+    -------
+    tuple
+        A tuple of (charges, dipoles, quadrupoles, octupoles) where:
+        - charges: array of shape (N,)
+        - dipoles: array of shape (N, 3) or None if max_moment < 1
+        - quadrupoles: array of shape (N, 3, 3) or None if max_moment < 2
+        - octupoles: array of shape (N, 3, 3, 3) or None if max_moment < 3
+    """
+    n_atoms = multipoles.shape[0]
+
+    # l=0: Monopole (charge) - 1 component
+    charges = multipoles[:, 0]
+    idx = 1
+
+    # l=1: Dipole (x, y, z) - 3 components
+    dipoles = None
+    if max_moment >= 1:
+        dipoles = multipoles[:, idx : idx + 3]
+    idx += 3
+
+    # l=2: Quadrupole - 6 unique components (xx, xy, xz, yy, yz, zz)
+    quadrupoles = None
+    if max_moment >= 2:
+        quadrupoles = np.zeros((n_atoms, 3, 3))
+        for i in range(n_atoms):
+            quadrupoles[i, 0, 0] = multipoles[i, idx + 0]  # xx
+            quadrupoles[i, 0, 1] = quadrupoles[i, 1, 0] = multipoles[i, idx + 1]  # xy
+            quadrupoles[i, 0, 2] = quadrupoles[i, 2, 0] = multipoles[i, idx + 2]  # xz
+            quadrupoles[i, 1, 1] = multipoles[i, idx + 3]  # yy
+            quadrupoles[i, 1, 2] = quadrupoles[i, 2, 1] = multipoles[i, idx + 4]  # yz
+            quadrupoles[i, 2, 2] = multipoles[i, idx + 5]  # zz
+    idx += 6
+
+    # l=3: Octupole - 10 unique components
+    # Order: xxx, xxy, xxz, xyy, xyz, xzz, yyy, yyz, yzz, zzz
+    octupoles = None
+    if max_moment >= 3:
+        octupoles = np.zeros((n_atoms, 3, 3, 3))
+        for i in range(n_atoms):
+            octupoles[i, 0, 0, 0] = multipoles[i, idx + 0]  # xxx
+            xxy = multipoles[i, idx + 1]  # xxy
+            xxz = multipoles[i, idx + 2]  # xxz
+            xyy = multipoles[i, idx + 3]  # xyy
+            xyz = multipoles[i, idx + 4]  # xyz
+            xzz = multipoles[i, idx + 5]  # xzz
+            yyy = multipoles[i, idx + 6]  # yyy
+            yyz = multipoles[i, idx + 7]  # yyz
+            yzz = multipoles[i, idx + 8]  # yzz
+            zzz = multipoles[i, idx + 9]  # zzz
+
+            # Fill in all permutations
+            octupoles[i, 0, 0, 1] = octupoles[i, 0, 1, 0] = octupoles[i, 1, 0, 0] = xxy
+            octupoles[i, 0, 0, 2] = octupoles[i, 0, 2, 0] = octupoles[i, 2, 0, 0] = xxz
+            octupoles[i, 0, 1, 1] = octupoles[i, 1, 0, 1] = octupoles[i, 1, 1, 0] = xyy
+            octupoles[i, 0, 1, 2] = octupoles[i, 0, 2, 1] = octupoles[i, 1, 0, 2] = xyz
+            octupoles[i, 1, 2, 0] = octupoles[i, 2, 0, 1] = octupoles[i, 2, 1, 0] = xyz
+            octupoles[i, 0, 2, 2] = octupoles[i, 2, 0, 2] = octupoles[i, 2, 2, 0] = xzz
+            octupoles[i, 1, 1, 1] = yyy
+            octupoles[i, 1, 1, 2] = octupoles[i, 1, 2, 1] = octupoles[i, 2, 1, 1] = yyz
+            octupoles[i, 1, 2, 2] = octupoles[i, 2, 1, 2] = octupoles[i, 2, 2, 1] = yzz
+            octupoles[i, 2, 2, 2] = zzz
+
+    return charges, dipoles, quadrupoles, octupoles

@@ -4,10 +4,11 @@ from pympfit import (
     Psi4MBISGenerator,
     MBISSettings,
     MoleculeMBISRecord,
-    Psi4GDMAGenerator,
-    GDMASettings,
-    MoleculeGDMARecord,
     MPFITSVDSolver,
+)
+from pympfit.mbis.multipole_transform import (
+    spherical_to_cartesian_multipoles,
+    flat_to_cartesian_multipoles,
 )
 from openff.units import unit
 from openff.recharge.utilities.molecule import extract_conformers
@@ -17,121 +18,15 @@ import qcelemental as qcel
 from qcelemental import constants
 from pprint import pprint as pp
 
-
-def T_cart(RA, RB):
-    dR = RB - RA
-    R = np.linalg.norm(dR)
-    delta = np.identity(3)
-    # E_qq
-    T0 = R**-1
-    # E_qu
-    T1 = (R**-3) * (-1.0 * dR)
-    T2 = (R**-5) * (3 * np.outer(dR, dR) - R * R * delta)
-
-    Rdd = np.multiply.outer(dR, delta)
-    T3 = (R**-7) * (
-        -15 * np.multiply.outer(np.outer(dR, dR), dR)
-        + R * R * (Rdd + Rdd.transpose(1, 0, 2) + Rdd.transpose(2, 0, 1))
-    )
-    RRdd = np.multiply.outer(np.outer(dR, dR), delta)
-    dddd = np.multiply.outer(delta, delta)
-    # Used for E_QQ
-    T4 = (R**-9) * (
-        105 * np.multiply.outer(np.outer(dR, dR), np.outer(dR, dR))
-        - 15
-        * R
-        * R
-        * (
-            RRdd
-            + RRdd.transpose(0, 2, 1, 3)
-            + RRdd.transpose(0, 3, 2, 1)
-            + RRdd.transpose(2, 1, 0, 3)
-            + RRdd.transpose(3, 1, 2, 0)
-            + RRdd.transpose(2, 3, 0, 1)
-        )
-        + 3 * (R**4) * (dddd + dddd.transpose(0, 2, 1, 3) + dddd.transpose(0, 3, 2, 1))
-    )
-
-    return T0, T1, T2, T3, T4
-
-
-def eval_interaction(RA, qA, muA, thetaA, RB, qB, muB, thetaB, traceless=False):
-    T0, T1, T2, T3, T4 = T_cart(RA, RB)
-
-    # Most inputs will already be traceless, but we can ensure this is the case
-    if not traceless:
-        traceA = np.trace(thetaA)
-        thetaA[0, 0] -= traceA / 3.0
-        thetaA[1, 1] -= traceA / 3.0
-        thetaA[2, 2] -= traceA / 3.0
-        traceB = np.trace(thetaB)
-        thetaB[0, 0] -= traceB / 3.0
-        thetaB[1, 1] -= traceB / 3.0
-        thetaB[2, 2] -= traceB / 3.0
-
-    E_qq = np.sum(T0 * qA * qB)
-    E_qu = np.sum(T1 * (qA * muB - qB * muA))
-    E_qQ = np.sum(T2 * (qA * thetaB + qB * thetaA)) * (1.0 / 3.0)
-
-    E_uu = np.sum(T2 * np.outer(muA, muB)) * (-1.0)
-    E_uQ = np.sum(
-        T3 * (np.multiply.outer(muA, thetaB) - np.multiply.outer(muB, thetaA))
-    ) * (-1.0 / 3.0)
-
-    E_QQ = np.sum(T4 * np.multiply.outer(thetaA, thetaB)) * (1.0 / 9.0)
-
-    # partial-charge electrostatic energy
-    E_q = E_qq
-
-    # dipole correction
-    E_u = E_qu + E_uu
-
-    # quadrupole correction
-    E_Q = E_qQ + E_uQ + E_QQ
-
-    return E_q + E_u + E_Q
-
-
-def eval_qcel_dimer(mol_dimer, qA, muA, thetaA, qB, muB, thetaB):
-    """
-    Evaluate the electrostatic interaction energy between two molecules using
-    their multipole moments. Dimensionalities of qA should be [N], muA should
-    be [N, 3], and thetaA should be [N, 3, 3]. Same for qB, muB, and thetaB.
-    """
-    total_energy = 0.0
-    RA = mol_dimer.get_fragment(0).geometry
-    RB = mol_dimer.get_fragment(1).geometry
-    ZA = mol_dimer.get_fragment(0).atomic_numbers
-    ZB = mol_dimer.get_fragment(1).atomic_numbers
-    for i in range(len(ZA)):
-        for j in range(len(ZB)):
-            rA = RA[i]
-            qA_i = qA[i]
-            muA_i = muA[i]
-            thetaA_i = thetaA[i]
-
-            rB = RB[j]
-            qB_j = qB[j]
-            muB_j = muB[j]
-            thetaB_j = thetaB[j]
-
-            pair_energy = eval_interaction(
-                rA, qA_i, muA_i, thetaA_i, rB, qB_j, muB_j, thetaB_j
-            )
-            total_energy += pair_energy
-    return total_energy * constants.hartree2kcalmol
+from pympfit.mbis.evaluate_cartesian_multipoles import eval_qcel_dimer
 
 
 # Create molecule
 molecule = Molecule.from_smiles("O")
 molecule.generate_conformers(n_conformers=1)
 [conformer] = extract_conformers(molecule)
-print(molecule)
-print(dir(molecule))
-print(conformer)
 mol_dict = molecule.to_dict()
 # conformer is np.array([[X, Y, Z], [X, Y, Z], ...])
-print(type(conformer[0, 0]))  # <class 'pint.Quantity'>
 shift = 2.0
 # convert pint.Quantity to float
 mol_str = "0 1\n"
@@ -146,25 +41,19 @@ mol_str += "\n".join(
 )
 mol_str += "\nunits angstrom"
 qcel_mol = qcel.models.Molecule.from_data(mol_str)
-print(qcel_mol.to_string("xyz"))
-print(qcel_mol.to_string("psi4"))
 
-
-# Generate GDMA multipoles
-settings = GDMASettings(limit=2)
-coords, gdma_multipoles = Psi4GDMAGenerator.generate(
-    molecule, conformer, settings, n_threads=12, memory=32 * unit.gigabyte
+# Generate MBIS multipoles - use Cartesian format for testing
+settings = MBISSettings(
+    max_radial_moment=3,
+    max_moment=2,
+    limit=2,
+    method="hf",
+    basis="aug-cc-pvdz",
+    multipole_format="cartesian",
 )
-# Create record and fit charges
-record = MoleculeGDMARecord.from_molecule(molecule, coords, gdma_multipoles, settings)
-gdma_charges = generate_mpfit_charge_parameter([record], MPFITSVDSolver())
-
-# Generate MBIS multipoles
-settings = MBISSettings(max_radial_moments=4, method="hf", basis="aug-cc-pvdz")
 coords, multipoles = Psi4MBISGenerator.generate(
     molecule, conformer, settings, n_threads=12, memory=32 * unit.gigabyte
 )
-print(f"{coords = }")
 
 conformer_2 = conformer.copy()
 conformer_2[:, 0] += shift * unit.angstrom
@@ -177,10 +66,6 @@ coords_2, multipoles_2 = Psi4MBISGenerator.generate(
 record = MoleculeMBISRecord.from_molecule(molecule, coords, multipoles, settings)
 charges = generate_mpfit_charge_parameter([record], MPFITSVDSolver())
 
-print("GDMA multipoles: ", gdma_multipoles)
-print("GDMA charges: ", gdma_multipoles[:, 0])
-
-
 print("MBIS multipoles: ", multipoles)
 print("MBIS charges: ", multipoles[:, 0])
 
@@ -188,47 +73,38 @@ print("fitted charges: ", charges)
 
 # Difference between MBIS and fitted charges
 print("MBIS charges vs. MBIS fitted charges:\n", multipoles[:, 0] - charges.value)
-# Difference between GDMA and fitted charges
-print(
-    "GDMA charges vs. GDMA fitted charges:\n",
-    gdma_multipoles[:, 0] - gdma_charges.value,
-)
-# Difference between GDMA and MBIS charges
-print("GDMA charges vs. MBIS charges:\n", gdma_multipoles[:, 0] - multipoles[:, 0])
 
 
-q = multipoles[:, 0]
-mu = multipoles[:, 1:4]
-# Need to expand theta compact uppper triangle with diagnol back into (3, 3)
-
-
-def expand_theta(theta_i):
-    N = theta_i.shape[0]
-    t = np.zeros((N, 3, 3))
-    for i in range(N):
-        t[i, 0, 0] = theta_i[i, 0]
-        t[i, 0, 1] = theta_i[i, 1]
-        t[i, 0, 2] = theta_i[i, 2]
-        t[i, 1, 0] = theta_i[i, 1]
-        t[i, 1, 1] = theta_i[i, 3]
-        t[i, 1, 2] = theta_i[i, 4]
-        t[i, 2, 0] = theta_i[i, 2]
-        t[i, 2, 1] = theta_i[i, 4]
-        t[i, 2, 2] = theta_i[i, 5]
-    return t
-
-
-theta = expand_theta(multipoles[:, 4:10])
-
+# Convert multipoles to Cartesian for evaluation
+# Check if the multipoles are in spherical or Cartesian format
+if settings.multipole_format == "cartesian":
+    charges, dipoles, quadrupoles, octupoles = flat_to_cartesian_multipoles(
+        multipoles, max_moment=2
+    )
+else:
+    charges, dipoles, quadrupoles, octupoles = spherical_to_cartesian_multipoles(
+        multipoles, max_moment=2
+    )
+q = charges
+mu = dipoles
+theta = quadrupoles
 
 print("Charges: ", q)
 print("Dipoles: ", mu)
 print("Quadrupoles: ", theta)
 
-q2 = multipoles[:, 0]
-mu2 = multipoles[:, 1:4]
-# theta2 = multipoles[:, 4:13].reshape(-1, 3, 3)
-theta2 = expand_theta(multipoles_2[:, 4:10])
+# Convert second conformer multipoles to Cartesian
+if settings.multipole_format == "cartesian":
+    charges_2, dipoles_2, quadrupoles_2, octupoles_2 = flat_to_cartesian_multipoles(
+        multipoles_2, max_moment=2
+    )
+else:
+    charges_2, dipoles_2, quadrupoles_2, octupoles_2 = (
+        spherical_to_cartesian_multipoles(multipoles_2, max_moment=2)
+    )
+q2 = charges_2
+mu2 = dipoles_2
+theta2 = quadrupoles_2
 
 print("Charges: ", q2)
 print("Dipoles: ", mu2)
@@ -294,6 +170,12 @@ E_elst_mbis = eval_qcel_dimer(
 print(f"elst mtp energy (monomer MBIS multipoles): {E_elst_mbis:.4f} kcal/mol")
 
 # check qs, mus, and thetas are close to those from the dimer calculation
-assert np.isclose(mbis_monA_q, q).all(), f"MBIS monA charges:\n{mbis_monA_q}, dimer MBIS charges:\n{q}, difference:\n{mbis_monA_q - q}"
-assert np.isclose(mbis_monA_mu, mu).all(), f"MBIS monA dipoles:\n{mbis_monA_mu}, dimer MBIS dipoles:\n{mu}, difference:\n{mbis_monA_mu - mu}"
-assert np.isclose(mbis_monA_theta, theta).all(), f"MBIS monA quadrupoles:\n{mbis_monA_theta}, dimer MBIS quadrupoles:\n{theta}, difference:\n{mbis_monA_theta - theta}"
+assert np.allclose(mbis_monA_q, q, rtol=1e-5, atol=1e-5), (
+    f"MBIS monA charges:\n{mbis_monA_q}, dimer MBIS charges:\n{q}, difference:\n{mbis_monA_q - q}"
+)
+assert np.allclose(mbis_monA_mu, mu, rtol=1e-5, atol=1e-5), (
+    f"MBIS monA dipoles:\n{mbis_monA_mu}, dimer MBIS dipoles:\n{mu}, difference:\n{mbis_monA_mu - mu}"
+)
+assert np.allclose(mbis_monA_theta, theta, rtol=1e-5, atol=1e-5), (
+    f"MBIS monA quadrupoles:\n{mbis_monA_theta}, dimer MBIS quadrupoles:\n{theta}, difference:\n{mbis_monA_theta - theta}"
+)

@@ -50,8 +50,18 @@ class MBISSettings(BaseModel):
     max_radial_moment: int = Field(
         4,
         description=(
-            "Maximum radial moment to compute for each atom. "
+            "Maximum radial moment to compute for each atom in Psi4. "
+            "This is passed to Psi4's max_radial_moment keyword. "
             "n=1 to 4 supported: 1=charges, 2=dipoles, 3=quadrupoles, 4=octupoles."
+        ),
+    )
+    max_moment: int = Field(
+        2,
+        description=(
+            "Maximum multipole moment to read and store from MBIS calculation. "
+            "Controls which multipoles are loaded and used for MBIS records. "
+            "0=charges, 1=+dipoles, 2=+quadrupoles, 3=+octupoles. "
+            "Must be <= max_radial_moment - 1."
         ),
     )
     mbis_d_convergence: int = Field(
