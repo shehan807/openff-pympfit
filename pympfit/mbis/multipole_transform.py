@@ -524,6 +524,7 @@ def cartesian_multipoles_to_flat(
 
     This keeps the Cartesian representation but flattens tensors.
     All unique components of symmetric tensors are stored.
+    Quadrupoles are made traceless before storage.
 
     Parameters
     ----------
@@ -532,7 +533,7 @@ def cartesian_multipoles_to_flat(
     dipoles
         MBIS dipoles of shape (N, 3), or None.
     quadrupoles
-        MBIS quadrupoles of shape (N, 3, 3), or None.
+        MBIS quadrupoles of shape (N, 3, 3), or None. Will be made traceless.
     octupoles
         MBIS octupoles of shape (N, 3, 3, 3), or None.
     max_moment
@@ -545,7 +546,7 @@ def cartesian_multipoles_to_flat(
         Components for each rank are stored in the following order:
         - l=0: q (1 component, index 0)
         - l=1: x, y, z (3 components, indices 1-3)
-        - l=2: xx, xy, xz, yy, yz, zz (6 components, indices 4-9)
+        - l=2: xx, xy, xz, yy, yz, zz (6 components, indices 4-9, traceless)
         - l=3: xxx, xxy, xxz, xyy, xyz, xzz, yyy, yyz, yzz, zzz
                (10 components, indices 10-19)
 
@@ -556,6 +557,9 @@ def cartesian_multipoles_to_flat(
     - max_moment=2: 1 + 3 + 6 = 10
     - max_moment=3: 1 + 3 + 6 + 10 = 20
     - max_moment=4: 1 + 3 + 6 + 10 + 15 = 35
+
+    Quadrupoles are automatically made traceless (Tr(Q) = 0) before storage,
+    as this is the physically meaningful form for multipole expansions.
     """
     charges = np.atleast_1d(charges.flatten())
     n_atoms = len(charges)
@@ -575,9 +579,15 @@ def cartesian_multipoles_to_flat(
     idx += 3
 
     # l=2: Quadrupole - 6 unique components (xx, xy, xz, yy, yz, zz)
+    # Note: Make quadrupoles traceless before storing
     if max_moment >= 2 and quadrupoles is not None:
         for i in range(n_atoms):
-            q = quadrupoles[i]
+            q = quadrupoles[i].copy()  # Copy to avoid modifying input
+            # Make traceless: subtract trace/3 from diagonal elements
+            trace = q[0, 0] + q[1, 1] + q[2, 2]
+            q[0, 0] -= trace / 3.0
+            q[1, 1] -= trace / 3.0
+            q[2, 2] -= trace / 3.0
             multipoles[i, idx + 0] = q[0, 0]  # xx
             multipoles[i, idx + 1] = q[0, 1]  # xy
             multipoles[i, idx + 2] = q[0, 2]  # xz
