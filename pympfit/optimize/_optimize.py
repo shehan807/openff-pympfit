@@ -244,17 +244,23 @@ class MPFITObjective(Objective):
         bohr_conformer = unit.convert(
             multipole_record.conformer, unit.angstrom, unit.bohr
         )
+        # Convert limit to 0-indexed max_rank for MBIS (1-based) vs GDMA (0-based)
+        if isinstance(multipole_record, MoleculeGDMARecord):
+            max_rank = settings.limit  # GDMA uses 0-based indexing
+        else:
+            max_rank = settings.limit - 1  # MBIS uses 1-based indexing
+
         multipoles = _convert_flat_to_hierarchical(
-            multipole_record.multipoles, molecule.n_atoms, settings.limit
+            multipole_record.multipoles, molecule.n_atoms, max_rank
         )
         return {
             "bohr_conformer": bohr_conformer,
             "multipoles": multipoles,
             "rvdw": np.full(molecule.n_atoms, settings.mpfit_atom_radius),
-            "lmax": np.full(molecule.n_atoms, settings.limit, dtype=float),
+            "lmax": np.full(molecule.n_atoms, max_rank, dtype=float),
             "r1": settings.mpfit_inner_radius,
             "r2": settings.mpfit_outer_radius,
-            "maxl": settings.limit,
+            "maxl": max_rank,
             "n_atoms": molecule.n_atoms,
         }
 

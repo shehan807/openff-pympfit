@@ -164,17 +164,17 @@ class Psi4MBISGenerator(MBISGenerator):
 
                 # Load dipoles if available
                 mbis_dipoles = None
-                if max_moment >= 1 and os.path.exists("mbis_dipoles.npy"):
+                if max_moment >= 2 and os.path.exists("mbis_dipoles.npy"):
                     mbis_dipoles = np.load("mbis_dipoles.npy")
 
                 # Load quadrupoles if available
                 mbis_quadrupoles = None
-                if max_moment >= 2 and os.path.exists("mbis_quadrupoles.npy"):
+                if max_moment >= 3 and os.path.exists("mbis_quadrupoles.npy"):
                     mbis_quadrupoles = np.load("mbis_quadrupoles.npy")
 
                 # Load octupoles if available
                 mbis_octupoles = None
-                if max_moment >= 3 and os.path.exists("mbis_octupoles.npy"):
+                if max_moment >= 4 and os.path.exists("mbis_octupoles.npy"):
                     mbis_octupoles = np.load("mbis_octupoles.npy")
 
                 # Convert to the requested format

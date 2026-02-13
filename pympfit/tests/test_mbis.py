@@ -227,9 +227,9 @@ class TestPsi4MBISGenerator:
 
         n_atoms = 5  # methane: 1 C + 4 H
         # Number of components depends on max_moment (what we load) not max_radial_moment (what Psi4 computes)
-        # For spherical format: sum of (2*l + 1) for l=0 to max_moment
-        # max_moment=2 (default): 1 + 3 + 5 = 9 components
-        n_components = sum(2 * l + 1 for l in range(settings.max_moment + 1))
+        # For spherical format: sum of (2*l + 1) for l=0 to max_moment-1
+        # max_moment=3 (default): 1 + 3 + 5 = 9 components
+        n_components = sum(2 * l + 1 for l in range(settings.max_moment))
 
         assert mp.shape == (n_atoms, n_components)
         assert output_conformer.shape == input_conformer.shape
@@ -376,8 +376,8 @@ class TestMultipoleTransform:
             max_moment=4,
         )
 
-        # Shape should be (n_atoms, (max_moment+1)^2) = (3, 25)
-        assert mp.shape == (n_atoms, 25)
+        # Shape should be (n_atoms, max_moment^2) = (3, 16)
+        assert mp.shape == (n_atoms, 16)
 
         # Charges should be preserved in first column
         np.testing.assert_allclose(mp[:, 0], charges, rtol=1e-10)
@@ -457,8 +457,8 @@ class TestMultipoleTransform:
             max_moment=4,
         )
 
-        # Shape should be (n_atoms, (max_moment+1)^2) = (3, 25)
-        assert mp.shape == (n_atoms, 25)
+        # Shape should be (n_atoms, max_moment^2) = (3, 16)
+        assert mp.shape == (n_atoms, 16)
 
         # Convert back to Cartesian
         (
@@ -494,7 +494,7 @@ class TestMultipoleTransform:
             dipoles=dipoles,
             quadrupoles=quadrupoles,
             octupoles=octupoles,
-            max_moment=3,
+            max_moment=4,
         )
 
         # Shape: 1 (charge) + 3 (dipole) + 6 (quadrupole) + 10 (octupole) = 20
@@ -571,8 +571,8 @@ class TestMBISMultipoleEvaluation:
         # Generate MBIS multipoles with Cartesian format
         settings = MBISSettings(
             max_radial_moment=3,
-            max_moment=2,
-            limit=2,
+            max_moment=3,
+            limit=3,
             method="hf",
             basis="aug-cc-pvdz",
             multipole_format="cartesian",
@@ -603,10 +603,10 @@ class TestMBISMultipoleEvaluation:
 
         # Convert multipoles to Cartesian tensors
         charges_a, dipoles_a, quadrupoles_a, _ = flat_to_cartesian_multipoles(
-            multipoles, max_moment=2
+            multipoles, max_moment=3
         )
         charges_b, dipoles_b, quadrupoles_b, _ = flat_to_cartesian_multipoles(
-            multipoles_2, max_moment=2
+            multipoles_2, max_moment=3
         )
 
         # Evaluate electrostatic interaction energy

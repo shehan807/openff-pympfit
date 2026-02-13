@@ -30,7 +30,8 @@ class MBISSettings(BaseModel):
     limit: int = Field(
         3,
         description=(
-            "The order of multipole expansion on each site. Currently limited to "
+            "The order of multipole expansion on each site for MPFIT fitting. "
+            "Should match max_moment to ensure consistency. Currently limited to "
             "the same order for all sites; for more advanced usage a user-provided "
             "MBIS data file should be provided."
         ),
@@ -56,12 +57,12 @@ class MBISSettings(BaseModel):
         ),
     )
     max_moment: int = Field(
-        2,
+        3,
         description=(
             "Maximum multipole moment to read and store from MBIS calculation. "
             "Controls which multipoles are loaded and used for MBIS records. "
-            "0=charges, 1=+dipoles, 2=+quadrupoles, 3=+octupoles. "
-            "Must be <= max_radial_moment - 1."
+            "1=charges, 2=+dipoles, 3=+quadrupoles, 4=+octupoles. "
+            "Must be <= max_radial_moment."
         ),
     )
     mbis_d_convergence: int = Field(
