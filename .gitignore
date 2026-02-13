@@ -109,6 +109,7 @@ docs/ref/api/
 .mypy_cache/
 
 # Generated version file (versioningit)
+openff_pympfit/_version.py
 pympfit/_version.py
 
 # profraw files from LLVM? Unclear exactly what triggers this
@@ -123,6 +124,9 @@ pympfit/_version.py
 
 # dataset files
 spice-gdma.log
+*.npy 
+*.pkl 
+*.sqlite 
 *.npy
 !pympfit/tests/data/esp/*.npy
 *.pkl 
@@ -139,3 +143,4 @@ timer.dat
 
 # Psi4 temporary files
 psi.*.clean
+tmp.py

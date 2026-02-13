@@ -1,5 +1,5 @@
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 from openff.recharge.charges.library import LibraryChargeParameter
@@ -8,8 +8,12 @@ from openff.toolkit.utils.exceptions import AtomMappingWarning
 from openff.units import unit
 
 from pympfit.gdma.storage import MoleculeGDMARecord
+from pympfit.mbis.storage import MoleculeMBISRecord
 from pympfit.mpfit.solvers import MPFITSolver
 from pympfit.optimize import MPFITObjective
+
+# Type alias for records that can be used with MPFIT
+MultipoleRecord = Union[MoleculeGDMARecord, MoleculeMBISRecord]
 
 if TYPE_CHECKING:
     from openff.recharge.charges.vsite import VirtualSiteCollection
@@ -69,7 +73,7 @@ def molecule_to_mpfit_library_charge(molecule: "Molecule") -> LibraryChargeParam
 
 
 def _fit_single_conformer(
-    gdma_record: MoleculeGDMARecord,
+    multipole_record: MultipoleRecord,
     solver: "MPFITSolver",
     vsite_collection: "VirtualSiteCollection | None" = None,
 ) -> tuple[np.ndarray, np.ndarray | None]:
@@ -77,8 +81,8 @@ def _fit_single_conformer(
 
     Parameters
     ----------
-    gdma_record
-        The GDMA record for this conformer.
+    multipole_record
+        The multipole record (GDMA or MBIS) for this conformer.
     solver
         The solver to use for fitting.
     vsite_collection
@@ -94,7 +98,7 @@ def _fit_single_conformer(
     # Generate objective term for this single conformer
     objective_terms_and_masks = list(
         MPFITObjective.compute_objective_terms(
-            [gdma_record],
+            [multipole_record],
             vsite_collection=vsite_collection,
             return_quse_masks=True,
         )
@@ -113,7 +117,7 @@ def _fit_single_conformer(
 
     # Split into atom and vsite charges
     molecule = Molecule.from_mapped_smiles(
-        gdma_record.tagged_smiles, allow_undefined_stereo=True
+        multipole_record.tagged_smiles, allow_undefined_stereo=True
     )
     n_atoms = molecule.n_atoms
     atom_charges = all_charges[:n_atoms].flatten()
@@ -123,7 +127,7 @@ def _fit_single_conformer(
 
 
 def generate_mpfit_charge_parameter(
-    gdma_records: list[MoleculeGDMARecord],
+    multipole_records: list[MultipoleRecord],
     solver: MPFITSolver | None = None,
     vsite_collection: "VirtualSiteCollection | None" = None,
 ) -> LibraryChargeParameter | tuple[LibraryChargeParameter, np.ndarray]:
@@ -134,10 +138,10 @@ def generate_mpfit_charge_parameter(
 
     Parameters
     ----------
-    gdma_records
-        The records containing the distributed multipole data. If multiple
-        records are provided, charges are fit independently for each and
-        averaged.
+    multipole_records
+        The records containing the distributed multipole data (GDMA or MBIS).
+        If multiple records are provided, charges are fit independently for
+        each and averaged.
     solver
         The solver to use when finding the charges that minimize the MPFIT loss
         function. By default, the SVD solver is used.
@@ -162,10 +166,10 @@ def generate_mpfit_charge_parameter(
         Molecule.from_mapped_smiles(
             record.tagged_smiles, allow_undefined_stereo=True
         ).to_smiles(mapped=False)
-        for record in gdma_records
+        for record in multipole_records
     }
     if len(unique_smiles) != 1:
-        msg = "all GDMA records must be generated for the same molecule"
+        msg = "all multipole records must be generated for the same molecule"
         raise ValueError(msg)
 
     molecule = Molecule.from_smiles(
@@ -178,7 +182,7 @@ def generate_mpfit_charge_parameter(
     # Fit each conformer independently and average the results
     all_atom_charges = []
     all_vsite_charges = []
-    for record in gdma_records:
+    for record in multipole_records:
         atom_charges, vsite_charges = _fit_single_conformer(
             record, solver, vsite_collection
         )
@@ -271,7 +275,8 @@ def generate_global_atom_type_labels(
 
         # Atom classification ("within" molecule)
         methyl_carbons = {
-            i for i, in molecule.chemical_environment_matches("[#6X4H3,#6H4,#6X4H2:1]")
+            i
+            for (i,) in molecule.chemical_environment_matches("[#6X4H3,#6H4,#6X4H2:1]")
         }
         methyl_hydrogens = {
             atom.molecule_atom_index
@@ -345,7 +350,7 @@ def generate_global_atom_type_labels(
 
 
 def generate_constrained_mpfit_charge_parameter(
-    gdma_records: list[MoleculeGDMARecord],
+    multipole_records: list[MultipoleRecord],
     molecules: list["Molecule"],
     solver: "ConstrainedMPFITSolver | None" = None,
     atom_type_labels: list[list[str]] | None = None,
@@ -365,10 +370,10 @@ def generate_constrained_mpfit_charge_parameter(
 
     Parameters
     ----------
-    gdma_records
-        One GDMA record per molecule (one conformer each).
+    multipole_records
+        One multipole record (GDMA or MBIS) per molecule (one conformer each).
     molecules
-        The molecules corresponding to each GDMA record, in the same order.
+        The molecules corresponding to each multipole record, in the same order.
         The formal charge of each molecule is read from
         ``molecule.total_charge``.
     solver
@@ -408,9 +413,9 @@ def generate_constrained_mpfit_charge_parameter(
         build_quse_matrix,
     )
 
-    if len(gdma_records) != len(molecules):
+    if len(multipole_records) != len(molecules):
         msg = (
-            f"gdma_records has {len(gdma_records)} entries, "
+            f"multipole_records has {len(multipole_records)} entries, "
             f"but molecules has {len(molecules)}"
         )
         raise ValueError(msg)
@@ -455,7 +460,7 @@ def generate_constrained_mpfit_charge_parameter(
     all_lmax = []
     atom_counts = []
 
-    for record in gdma_records:
+    for record in multipole_records:
         arrays = MPFITObjective.extract_arrays(record)
         all_xyz.append(arrays["bohr_conformer"])
         all_multipoles.append(arrays["multipoles"])
@@ -463,7 +468,12 @@ def generate_constrained_mpfit_charge_parameter(
         all_lmax.append(arrays["lmax"])
         atom_counts.append(arrays["n_atoms"])
 
-    settings = gdma_records[0].gdma_settings
+    # Get settings from first record (works for both GDMA and MBIS)
+    first_record = multipole_records[0]
+    if isinstance(first_record, MoleculeGDMARecord):
+        settings = first_record.gdma_settings
+    else:
+        settings = first_record.mbis_settings
 
     xyzcharge = np.vstack(all_xyz)
     xyzmult = np.vstack(all_xyz)

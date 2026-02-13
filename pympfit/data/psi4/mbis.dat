@@ -1,0 +1,64 @@
+memory {{ memory }}
+
+molecule mol {
+  noreorient
+  nocom
+  {{ charge }} {{ spin }}
+  {% for atom in atoms -%}
+  {{ atom.element }} {{ '% 0.9f' | format(atom.x|float) }} {{ '% 0.9f' | format(atom.y|float) }} {{ '% 0.9f' | format(atom.z|float) }}
+  {% endfor %}
+}
+
+set {
+  basis {{ basis }}
+{%- if compute_mp %}
+d_convergence {{ d_convergence }}
+e_convergence {{ e_convergence }}
+dft_radial_points {{ dft_radial_points }}
+dft_spherical_points {{ dft_spherical_points }}
+guess {{ guess }}
+mbis_d_convergence {{ mbis_d_convergence }}
+mbis_radial_points {{ mbis_radial_points }}
+mbis_spherical_points {{ mbis_spherical_points }}
+max_radial_moment {{ max_radial_moment }}
+{%- endif %}
+}
+
+{%- if minimize %}
+optimize('{{ method }}')
+{%- endif %}
+
+# Calculate the wavefunction
+energy, wfn = energy('{{ method }}', return_wfn=True)
+
+{%- if compute_mp %}
+# Run OEPROP
+oeprop(
+    wfn,
+    'mbis_charges',
+)
+print('OEPROP')
+{%- endif %}
+
+# Save final geometry
+mol.save_xyz_file('final-geometry.xyz', 1)
+
+import numpy as np
+
+{%- if compute_mp %}
+mbis_charges = wfn.variable('MBIS CHARGES')
+np.save('mbis_charges.npy', mbis_charges)
+# Need to ensure max_radial_mooment is > 1
+{%- if max_radial_moment | int > 1 %}
+mbis_dipoles = wfn.variable('MBIS DIPOLES')
+np.save('mbis_dipoles.npy', mbis_dipoles)
+{%- endif %}
+{%- if max_radial_moment | int > 2 %}
+mbis_quadrupoles = wfn.variable('MBIS QUADRUPOLES')
+np.save('mbis_quadrupoles.npy', mbis_quadrupoles)
+{%- endif %}
+{%- if max_radial_moment | int > 3 %}
+mbis_octupoles = wfn.variable('MBIS OCTUPOLES')
+np.save('mbis_octupoles.npy', mbis_octupoles)
+{%- endif %}
+{%- endif %}

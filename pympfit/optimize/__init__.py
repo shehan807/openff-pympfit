@@ -1,8 +1,13 @@
-"""Objective functions for training against GDMA multipole data."""
+"""Objective functions for training against multipole data (GDMA or MBIS)."""
 
-from pympfit.optimize._optimize import MPFITObjective, MPFITObjectiveTerm
+from pympfit.optimize._optimize import (
+    MPFITObjective,
+    MPFITObjectiveTerm,
+    MultipoleRecord,
+)
 
 __all__ = [
     "MPFITObjective",
     "MPFITObjectiveTerm",
+    "MultipoleRecord",
 ]
