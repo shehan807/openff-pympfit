@@ -220,8 +220,21 @@ class MPFITObjective(Objective):
     def extract_arrays(
         cls,
         gdma_record: MoleculeGDMARecord,
+        fit_limit: int | None = None,
     ) -> dict:
-        """Extract numerical arrays from a single GDMA record."""
+        """Extract numerical arrays from a single GDMA record.
+
+        Parameters
+        ----------
+        gdma_record
+            The GDMA record containing multipoles and settings.
+        fit_limit
+            Optional maximum multipole rank to use for fitting. When provided
+            and less than the GDMA ``limit``, the multipole tensor is truncated
+            so that only terms up to this rank are included in the fit. This
+            allows running GDMA once at a high rank and fitting charges at
+            multiple lower ranks without rerunning GDMA.
+        """
         from openff.toolkit import Molecule
 
         from pympfit.mpfit.core import _convert_flat_to_hierarchical
@@ -234,14 +247,27 @@ class MPFITObjective(Objective):
         multipoles = _convert_flat_to_hierarchical(
             gdma_record.multipoles, molecule.n_atoms, settings.limit
         )
+
+        # Determine effective rank for fitting
+        effective_limit = settings.limit
+        if fit_limit is not None:
+            if fit_limit > settings.limit:
+                raise ValueError(
+                    f"fit_limit ({fit_limit}) cannot exceed the GDMA expansion "
+                    f"rank ({settings.limit})"
+                )
+            if fit_limit < effective_limit:
+                effective_limit = fit_limit
+                multipoles = multipoles[:, : fit_limit + 1, : fit_limit + 1, :]
+
         return {
             "bohr_conformer": bohr_conformer,
             "multipoles": multipoles,
             "rvdw": np.full(molecule.n_atoms, settings.mpfit_atom_radius),
-            "lmax": np.full(molecule.n_atoms, settings.limit, dtype=float),
+            "lmax": np.full(molecule.n_atoms, effective_limit, dtype=float),
             "r1": settings.mpfit_inner_radius,
             "r2": settings.mpfit_outer_radius,
-            "maxl": settings.limit,
+            "maxl": effective_limit,
             "n_atoms": molecule.n_atoms,
         }
 
@@ -253,12 +279,21 @@ class MPFITObjective(Objective):
         _vsite_charge_parameter_keys: list[VirtualSiteChargeKey] | None = None,
         _vsite_coordinate_parameter_keys: list[VirtualSiteGeometryKey] | None = None,
         return_quse_masks: bool = False,
+        fit_limit: int | None = None,
     ) -> Generator[tuple[MPFITObjectiveTerm, dict] | MPFITObjectiveTerm, None, None]:
-        """Pre-calculates the terms that contribute to the total objective function."""
+        """Pre-calculates the terms that contribute to the total objective function.
+
+        Parameters
+        ----------
+        fit_limit
+            Optional maximum multipole rank for fitting. When provided and less
+            than the GDMA expansion rank, the multipole tensor is truncated so
+            only terms up to this rank are used.
+        """
         from pympfit.mpfit.core import build_A_matrix, build_b_vector
 
         for gdma_record in gdma_records:
-            arrays = cls.extract_arrays(gdma_record)
+            arrays = cls.extract_arrays(gdma_record, fit_limit=fit_limit)
             bohr_conformer = arrays["bohr_conformer"]
             multipoles = arrays["multipoles"]
             rvdw = arrays["rvdw"]

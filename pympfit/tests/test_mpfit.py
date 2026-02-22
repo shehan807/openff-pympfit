@@ -5,12 +5,14 @@ Analog: openff-recharge fork/_tests/charges/resp/test_resp.py
 
 import importlib
 from collections import defaultdict
+from pathlib import Path
 
 import numpy as np
 import pytest
 from openff.toolkit import Molecule
 from openff.units import unit
 
+from pympfit import GDMASettings
 from pympfit.mpfit._mpfit import (
     _generate_dummy_values,
     generate_global_atom_type_labels,
@@ -193,3 +195,102 @@ def test_generate_mpfit_charge_parameter_with_vsite(meoh_gdma_sto3g):
 
     total_charge = sum(parameter.value) + sum(vsite_charges)
     assert np.isclose(total_charge, 0.0, atol=1e-6)
+
+
+DATA_DIR_FL = Path(__file__).parent / "data" / "esp"
+GDMA_DIR_FL = Path(__file__).parent / "data" / "gdma"
+
+
+def _build_record_at_limit(name, smiles, from_db, limit):
+    """Run Psi4GDMAGenerator at the given limit and return a MoleculeGDMARecord.
+
+    For DB molecules, the conformer is extracted from the pre-computed DB record
+    (but GDMA is re-run at the requested limit).
+    """
+    from pympfit.gdma.psi4 import Psi4GDMAGenerator
+    from pympfit.gdma.storage import MoleculeGDMARecord, MoleculeGDMAStore
+
+    settings = GDMASettings(
+        method="scf",
+        basis="sto-3g",
+        limit=limit,
+        switch=0.0,
+        radius=["C", 0.53, "O", 0.53, "N", 0.53, "H", 0.53, "F", 0.53],
+    )
+
+    if from_db:
+        store = MoleculeGDMAStore(str(GDMA_DIR_FL / "ionic_liquids.sqlite"))
+        db_rec = store.retrieve(smiles=smiles)[0]
+        mol = Molecule.from_smiles(smiles, allow_undefined_stereo=True)
+        conformer = db_rec.conformer_quantity
+    else:
+        mol = Molecule.from_mapped_smiles(smiles, allow_undefined_stereo=True)
+        conformer = np.load(DATA_DIR_FL / f"{name}_conformer.npy") * unit.angstrom
+
+    conf_out, mults = Psi4GDMAGenerator.generate(
+        mol,
+        conformer,
+        settings,
+        minimize=False,
+    )
+    return MoleculeGDMARecord.from_molecule(mol, conf_out, mults, settings)
+
+
+@pytest.mark.parametrize(
+    "molecule_name, smiles, from_db",
+    [
+        ("formaldehyde", "[C:1]([H:3])([H:4])=[O:2]", False),
+        ("methyl_fluoride", "[C:1]([H:3])([H:4])([H:5])[F:2]", False),
+        ("formic_acid", "[H:4][C:1](=[O:2])[O:3][H:5]", False),
+        ("methylamine", "[C:1]([H:3])([H:4])([H:5])[N:2]([H:6])[H:7]", False),
+        ("acetaldehyde", "[C:1]([H:4])([H:5])([H:6])[C:2](=[O:3])[H:7]", False),
+        ("water", "[O:1]([H:2])[H:3]", False),
+        (
+            "benzene",
+            "[c:1]1([H:7])[c:2]([H:8])[c:3]([H:9])"
+            "[c:4]([H:10])[c:5]([H:11])[c:6]1[H:12]",
+            False,
+        ),
+        ("co2", "[O:1]=[C:2]=[O:3]", False),
+        ("mmim", "CN1C=C[N+](=C1)C", True),
+        ("emim", "CCN1C=C[N+](=C1)C", True),
+        ("bmim", "CCCCN1C=C[N+](=C1)C", True),
+        ("c6mim", "CCCCCCN1C=C[N+](=C1)C", True),
+    ],
+)
+@pytest.mark.parametrize("limit", [0, 1, 2, 3, 4])
+def test_fit_limit(molecule_name, smiles, from_db, limit):
+    """Verify that GDMA@limit=L + MPFIT(fit_limit=None) produces the same
+    charges as GDMA@limit=8 + MPFIT(fit_limit=L).
+
+    Also checks that fit_limit > GDMA limit raises ValueError.
+    """
+    from pympfit.optimize import MPFITObjective
+
+    solver = MPFITSVDSolver()
+
+    # Direct
+    record_direct = _build_record_at_limit(molecule_name, smiles, from_db, limit)
+    charges_direct = np.array(
+        generate_mpfit_charge_parameter([record_direct], solver, fit_limit=None).value
+    )
+    arrays_direct = MPFITObjective.extract_arrays(record_direct, fit_limit=None)
+
+    # Truncated
+    record_high = _build_record_at_limit(molecule_name, smiles, from_db, limit=8)
+    charges_truncated = np.array(
+        generate_mpfit_charge_parameter([record_high], solver, fit_limit=limit).value
+    )
+    arrays_truncated = MPFITObjective.extract_arrays(record_high, fit_limit=limit)
+
+    np.testing.assert_array_equal(
+        arrays_truncated["multipoles"],
+        arrays_direct["multipoles"],
+    )
+    assert arrays_truncated["maxl"] == limit
+    assert arrays_direct["maxl"] == limit
+
+    np.testing.assert_allclose(charges_truncated, charges_direct, atol=1e-12)
+
+    with pytest.raises(ValueError, match="cannot exceed"):
+        generate_mpfit_charge_parameter([record_direct], solver, fit_limit=limit + 1)
